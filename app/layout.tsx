@@ -5,12 +5,14 @@ import PWARegistration from "@/components/PWARegistration";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export const metadata: Metadata = {
     title: "Holy Moley - Mole Tracker",
     description: "Track and monitor your skin health in 3D",
     icons: {
-        icon: "/Icon/bitmap.png",
-        apple: "/Icon/bitmap.png",
+        icon: `${basePath}/Icon/bitmap.png`,
+        apple: `${basePath}/Icon/bitmap.png`,
     }
 };
 

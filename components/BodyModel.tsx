@@ -5,13 +5,14 @@ import { useAppStore, type AppState } from "@/store/appStore";
 import { useLayoutEffect } from "react";
 import * as THREE from "three";
 import MoleMarkers from "./MoleMarkers";
+import { getAssetPath } from "@/utils/paths";
 
 export default function BodyModel() {
     const gender = useAppStore((state: AppState) => state.gender);
     const isAddingMole = useAppStore((state: AppState) => state.isAddingMole);
 
     // Loading the specific model based on gender
-    const modelPath = gender === "male" ? "/models/male.glb" : "/models/female.glb";
+    const modelPath = gender === "male" ? getAssetPath("/models/male.glb") : getAssetPath("/models/female.glb");
     const { scene } = useGLTF(modelPath);
 
     useLayoutEffect(() => {
@@ -65,5 +66,5 @@ export default function BodyModel() {
 }
 
 // Preload models for smoothness
-useGLTF.preload("/models/male.glb");
-useGLTF.preload("/models/female.glb");
+useGLTF.preload(getAssetPath("/models/male.glb"));
+useGLTF.preload(getAssetPath("/models/female.glb"));

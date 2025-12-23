@@ -11,7 +11,7 @@ export default function BodyModel() {
     const isAddingMole = useAppStore((state: AppState) => state.isAddingMole);
 
     // Loading the specific model based on gender
-    const modelPath = gender === "male" ? "/holymoley/models/male.glb" : "/holymoley/models/female.glb";
+    const modelPath = gender === "male" ? "/models/male.glb" : "/models/female.glb";
     const { scene } = useGLTF(modelPath);
 
     useLayoutEffect(() => {
@@ -65,5 +65,5 @@ export default function BodyModel() {
 }
 
 // Preload models for smoothness
-useGLTF.preload("/holymoley/models/male.glb");
-useGLTF.preload("/holymoley/models/female.glb");
+useGLTF.preload("/models/male.glb");
+useGLTF.preload("/models/female.glb");

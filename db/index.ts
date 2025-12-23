@@ -16,6 +16,9 @@ export interface MoleEntry {
     size: number; // in mm
     texture?: string;
     notes: string;
+    // AR metadata placeholders
+    referenceObject?: string; // e.g., 'coin', 'ruler'
+    scaleReference?: number; // scale factor
 }
 
 export class AppDatabase extends Dexie {
@@ -24,7 +27,7 @@ export class AppDatabase extends Dexie {
 
     constructor() {
         super('HolyMoleyDB');
-        this.version(1).stores({
+        this.version(2).stores({
             moles: '++id, label, gender',
             entries: '++id, moleId, date'
         });

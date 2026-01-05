@@ -6,7 +6,9 @@ Track-A-Mole is a skin health monitoring application that allows users to map mo
 
 - 3D Interactive Mapping: Place and view markers on a realistic 3D model.
 - Photo Logs: Store photos of individual moles to monitor changes over time.
-- Data Privacy: All data is stored locally on the device using IndexedDB (Dexie.js).
+- Secure Data Portability: Export encrypted backups (.tam) with AES-GCM password protection.
+- Smart Reminders: Reliable "Nth Day of Month" notifications to stay on top of checks.
+- Data Privacy: Local-first architecture ensures health data never leaves the device.
 - Cross-Platform: Compatible with iOS, Android, and Web browsers.
 
 ## Technical Stack

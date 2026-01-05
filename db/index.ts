@@ -26,7 +26,7 @@ export class AppDatabase extends Dexie {
     entries!: Table<MoleEntry>;
 
     constructor() {
-        super('HolyMoleyDB');
+        super('TrackAMoleDB');
         this.version(2).stores({
             moles: '++id, label, gender',
             entries: '++id, moleId, date'

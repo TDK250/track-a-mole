@@ -404,7 +404,7 @@ export default function UIOverlay() {
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <h1 className="text-xl font-bold text-white flex items-center gap-2">
                         <span className="text-rose-500 text-2xl">●</span>
-                        <span className="tracking-tight">HolyMoley</span>
+                        <span className="tracking-tight">Track-A-Mole</span>
                     </h1>
 
                     <button

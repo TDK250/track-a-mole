@@ -29,3 +29,5 @@
     - [ ] Implement "Check Up" Reminder logic (simple frequency setting)
     - [ ] Create "Screening" Mockup (Visual feedback on mole danger signs - ABCDE rule)
     - [ ] Add Disclaimer Modal (Not medical advice)
+
+Most of this is done - list to be updated

@@ -1,28 +1,28 @@
-# Track-A-Mole  Mole Tracker
+# Track-A-Mole
 
-**Track-A-Mole** is a modern dermatology companion designed to help users monitor skin health by mapping moles onto a detailed 3D human model. It provides a secure, local-first experience for tracking changes over time.
+Track-A-Mole is a skin health monitoring application that allows users to map moles onto a 3D human model. It is designed for local-first data storage and cross-platform use.
 
-## 🚀 Key Features
+## Features
 
-- **3D Interactive Mapping**: Place and view moles on a realistic 3D body scene.
-- **Photo Logs**: Capture and securely store photos of individual moles for history tracking.
-- **Personal Privacy**: All data is stored locally in your browser/device database (Dexie.js).
-- **Mobile First**: Built for cross-platform availability on iOS, Android, and web.
+- 3D Interactive Mapping: Place and view markers on a realistic 3D model.
+- Photo Logs: Store photos of individual moles to monitor changes over time.
+- Data Privacy: All data is stored locally on the device using IndexedDB (Dexie.js).
+- Cross-Platform: Compatible with iOS, Android, and Web browsers.
 
-## 🛠 Tech Stack
+## Technical Stack
 
-- **Framework**: Next.js 16 (App Router)
-- **3D Engine**: Three.js with @react-three/fiber & @react-three/drei
-- **Database**: Dexie.js (IndexedDB)
-- **Native Bridge**: Capacitor
-- **Styling**: TailwindCSS
-- **State Management**: Zustand
+- Framework: Next.js (App Router)
+- 3D Engine: Three.js (@react-three/fiber)
+- Database: Dexie.js
+- Native Bridge: Capacitor
+- Styling: TailwindCSS
+- State Management: Zustand
 
-## 📦 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js (Latest LTS recommended)
 - npm
 
 ### Installation
@@ -45,20 +45,20 @@
 
 ### Mobile Development
 
-To build for mobile platforms:
+To synchronize the web build with native projects:
 
-- **Sync with native projects**: `npm run cap-sync`
-- **Open Android Studio**: `npm run mobile-android`
-- **Open Xcode**: `npm run mobile-ios`
+- Sync with native projects: `npm run cap-sync`
+- Open Android Studio: `npm run mobile-android`
+- Open Xcode: `npm run mobile-ios`
 
-## 🌐 Deployment
+## Deployment
 
-This project is automatically deployed to GitHub Pages via GitHub Actions when pushing to the `main` branch.
+The project is configured for automated deployment to GitHub Pages via GitHub Actions on every push to the main branch.
 
-## ⚖️ Disclaimer
+## Disclaimer
 
-Track-A-Mole is for personal tracking and educational purposes only. It is **NOT** a medical diagnostic tool and should not be used as a substitute for professional medical advice or diagnosis.
+Track-A-Mole is for personal tracking and educational purposes only. It is not a medical diagnostic tool and should not be used as a substitute for professional medical advice, diagnosis, or treatment.
 
-## 📄 License
+## License
 
-This project is licensed under the ISC License.
+This project is licensed under the ISC License. See the LICENSE file for details.

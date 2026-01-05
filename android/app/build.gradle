@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.tomkerr.holymoley"
+    namespace = "com.tomkerr.trackamole"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.tomkerr.holymoley"
+        applicationId "com.tomkerr.trackamole"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

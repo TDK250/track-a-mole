@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export const metadata: Metadata = {
-    title: "Holy Moley - Mole Tracker",
+    title: "Track-A-Mole",
     description: "Track and monitor your skin health in 3D",
     icons: {
         icon: `${basePath}/Icon/bitmap.png`,

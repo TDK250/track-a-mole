@@ -1,4 +1,4 @@
-package com.tomkerr.holymoley;
+package com.tomkerr.trackamole;
 
 import com.getcapacitor.BridgeActivity;
 

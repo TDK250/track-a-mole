@@ -1,0 +1,27 @@
+Build:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: android/app
+    gradle:
+      - yes
+
+AutoName: Track-A-Mole
+Categories:
+  - Health
+License: ISC
+WebSite: https://github.com/tomkerr/trackamole
+SourceCode: https://github.com/tomkerr/trackamole
+IssueTracker: https://github.com/tomkerr/trackamole/issues
+
+Summary: Track and monitor your skin health in 3D
+Description: |
+    Track-A-Mole is the ultimate tool for monitoring your skin health. Using a sophisticated 3D human model, you can accurately map the location of your moles and track changes over time.
+
+    Key Features:
+    - 3D Mole Mapping: Visualize your moles on a realistic 3D body model.
+    - Photo tracking: Capture and store photos of your moles to monitor development.
+    - Secure storage: All your data is stored locally on your device.
+    - Easy to use interface designed for skin health awareness.
+
+    Disclaimer: Track-A-Mole is for personal tracking and educational purposes only. It is not intended for medical diagnosis or as a substitute for professional medical advice.

@@ -1,0 +1,9 @@
+Track-A-Mole is the ultimate tool for monitoring your skin health. Using a sophisticated 3D human model, you can accurately map the location of your moles and track changes over time. 
+
+Key Features:
+- 3D Mole Mapping: Visualize your moles on a realistic 3D body model.
+- Photo tracking: Capture and store photos of your moles to monitor development.
+- Secure storage: All your data is stored locally on your device.
+- Easy to use interface designed for skin health awareness.
+
+Disclaimer: Track-A-Mole is for personal tracking and educational purposes only. It is not intended for medical diagnosis or as a substitute for professional medical advice.

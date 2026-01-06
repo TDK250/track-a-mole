@@ -159,6 +159,15 @@ export default function UIOverlay() {
         }
     };
 
+    const resetEntryForm = () => {
+        setEntryDate(new Date().toISOString().split('T')[0]);
+        setEntrySize("");
+        setEntryTexture("");
+        setEntryNotes("");
+        setEntryPhoto(null);
+        setEditingEntryId(null);
+    };
+
     const handleEntryPhotoUpload = async (source: CameraSource = CameraSource.Prompt) => {
         try {
             const image = await CapCamera.getPhoto({
@@ -249,12 +258,7 @@ export default function UIOverlay() {
                 await db.entries.add(entryData);
             }
 
-            // Reset form and close
-            setEntrySize("");
-            setEntryTexture("");
-            setEntryNotes("");
-            setEntryPhoto(null);
-            setEditingEntryId(null);
+            resetEntryForm();
             setShowAddEntry(false);
         } catch (error) {
             console.error("Failed to save entry:", error);
@@ -314,7 +318,13 @@ export default function UIOverlay() {
                                 <h2 className="text-xl font-bold text-white">
                                     {editingEntryId ? 'Update Check-up' : 'New Check-up'}
                                 </h2>
-                                <button onClick={() => { setShowAddEntry(false); setEditingEntryId(null); }} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors">
+                                <button
+                                    onClick={() => {
+                                        setShowAddEntry(false);
+                                        resetEntryForm();
+                                    }}
+                                    className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                                >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
@@ -968,7 +978,7 @@ export default function UIOverlay() {
                 style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
             >
                 <div className="max-w-xl mx-auto">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="popLayout">
                         {isAddingMole ? (
                             <AddMolePanel
                                 key="add"
@@ -979,7 +989,10 @@ export default function UIOverlay() {
                         ) : selectedMoleId ? (
                             <MoleDetailPanel
                                 key="detail"
-                                onAddEntry={() => setShowAddEntry(true)}
+                                onAddEntry={() => {
+                                    resetEntryForm();
+                                    setShowAddEntry(true);
+                                }}
                                 onDeleteMole={handleDeleteMole}
                                 onUpdateLabel={handleUpdateMoleLabel}
                                 onDeleteEntry={handleDeleteEntry}
@@ -1008,7 +1021,7 @@ function MoleListPanel({ moles }: { moles: any[] | undefined }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="glass rounded-3xl p-6 max-h-[50vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/80 pointer-events-auto"
+            className="glass rounded-3xl p-6 max-h-[50vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/80 pointer-events-auto w-full"
         >
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -1097,7 +1110,7 @@ function AddMolePanel({ onSave, label, setLabel }: { onSave: () => void, label: 
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="glass rounded-3xl p-6 border-t border-rose-500/20 shadow-2xl bg-slate-900/90 pointer-events-auto"
+            className="glass rounded-3xl p-6 border-t border-rose-500/20 shadow-2xl bg-slate-900/90 pointer-events-auto w-full"
         >
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -1216,7 +1229,7 @@ function MoleDetailPanel({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="glass rounded-3xl p-6 max-h-[70vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/90 pointer-events-auto"
+            className="glass rounded-3xl p-6 max-h-[70vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/90 pointer-events-auto w-full"
         >
             <div className="flex items-center justify-between mb-6">
                 <div className="flex-1">

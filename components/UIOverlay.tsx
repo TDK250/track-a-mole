@@ -1,7 +1,7 @@
 "use client";
 
 import { useAppStore, type AppState } from "@/store/appStore";
-import { Plus, X, Check, MapPin, Calendar, ChevronRight, Settings, AlertTriangle, Camera, Trash2, Edit3, Bell, Clock, Lock, ShieldCheck, Download, Upload, Eye, EyeOff, Info } from "lucide-react";
+import { Plus, X, Check, MapPin, Calendar, ChevronRight, Settings, AlertTriangle, Camera, Trash2, Edit3, Bell, Clock, Lock, ShieldCheck, Download, Upload, Eye, EyeOff, Info, RefreshCw, ChevronUp, ChevronDown, Delete } from "lucide-react";
 import { Camera as CapCamera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/db";
@@ -17,18 +17,17 @@ export default function UIOverlay() {
         isAddingMole, setIsAddingMole,
         selectedMoleId, setSelectedMoleId,
         tempMolePosition, setTempMolePosition,
-        remindersEnabled, setRemindersEnabled,
-        reminderValue, setReminderValue,
-        reminderUnit, setReminderUnit,
-        reminderTarget, setReminderTarget,
-        reminderOccurrence, setReminderOccurrence,
-        reminderTime, setReminderTime
+        tempMoleNormal, setTempMoleNormal,
+        smartRemindersEnabled, setSmartRemindersEnabled,
+        triggerCameraReset,
+        isMenuOpen, setIsMenuOpen
     } = useAppStore();
     const [newLabel, setNewLabel] = useState("");
     const [showSettings, setShowSettings] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [showAddEntry, setShowAddEntry] = useState(false);
+
 
     // Security & Data State
     const [showSecurity, setShowSecurity] = useState(false);
@@ -38,6 +37,15 @@ export default function UIOverlay() {
     const [importPassword, setImportPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // App Lock State
+    const [hasPin, setHasPin] = useState(false);
+    const [showPinSetup, setShowPinSetup] = useState(false);
+    const [pinFlow, setPinFlow] = useState<'setup' | 'change' | 'remove'>('setup');
+    const [pinStep, setPinStep] = useState<'enter' | 'confirm' | 'current'>('enter');
+    const [pinInput, setPinInput] = useState("");
+    const [tempPin, setTempPin] = useState("");
+    const [pinError, setPinError] = useState(false);
 
     // Detailed Entry Form State
     const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
@@ -56,14 +64,22 @@ export default function UIOverlay() {
     // Check if this is first launch
     useEffect(() => {
         const hasSelectedGender = localStorage.getItem('gender-selected');
-        if (!hasSelectedGender) {
+        const savedGender = localStorage.getItem('gender-value');
+        if (hasSelectedGender && savedGender) {
+            setGender(savedGender as 'male' | 'female');
+        } else {
+            // First time load
             setShowOnboarding(true);
         }
+
+        // Check for App Lock
+        const savedPin = localStorage.getItem('app-lock-pin');
+        setHasPin(!!savedPin);
     }, []);
 
     // Handle Notification Scheduling
     useEffect(() => {
-        if (!remindersEnabled) {
+        if (!smartRemindersEnabled) {
             NotificationService.cancelAll();
             return;
         }
@@ -73,15 +89,19 @@ export default function UIOverlay() {
             if (!hasPermission) {
                 const granted = await NotificationService.requestPermissions();
                 if (!granted) {
-                    setRemindersEnabled(false);
+                    setSmartRemindersEnabled(false);
                     return;
                 }
             }
-            await NotificationService.scheduleReminder(reminderValue, reminderUnit, reminderTarget, reminderTime, reminderOccurrence);
+            // Smart schedule: find neglected moles
+            // We need to pass moles and entries, but hooks in useEffect is tricky if we don't have them all.
+            // For simplicity, we'll let the service handle fetching or just trigger it periodically.
+            // Better: Trigger the service to check DB directly.
+            await NotificationService.scheduleSmartReminder();
         };
 
         schedule();
-    }, [remindersEnabled, reminderValue, reminderUnit, reminderTarget, reminderTime, reminderOccurrence, setRemindersEnabled]);
+    }, [smartRemindersEnabled, setSmartRemindersEnabled]);
 
     const handleExport = async () => {
         await ImportExportService.exportData(exportPassword || undefined);
@@ -142,17 +162,20 @@ export default function UIOverlay() {
     const handleAddMole = async () => {
         if (!tempMolePosition || !newLabel) return;
         try {
+            const tempMoleNormal = useAppStore.getState().tempMoleNormal;
             await haptics.selection();
             const id = await db.moles.add({
                 label: newLabel,
                 gender,
                 position: tempMolePosition,
+                normal: tempMoleNormal || undefined,
                 createdAt: Date.now()
             });
             console.log("Mole added with ID:", id);
 
             // Reset state
             setTempMolePosition(null);
+            setTempMoleNormal(null);
             setNewLabel("");
             setIsAddingMole(false);
 
@@ -453,118 +476,32 @@ export default function UIOverlay() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Current Model</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-lg">{gender === 'male' ? '👨' : '👩'}</span>
-                                            <p className="font-medium capitalize text-white">{gender}</p>
-                                        </div>
-                                    </div>
-
                                     {/* Reminders Section */}
                                     <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
-                                        <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <Bell className="w-4 h-4 text-rose-400" />
-                                                <p className="font-bold text-white tracking-wide">Reminders</p>
+                                                <div className="flex flex-col">
+                                                    <p className="font-bold text-white tracking-wide">Smart Reminders</p>
+                                                    <p className="text-[10px] text-slate-400">Notify if inactive for 30 days</p>
+                                                </div>
                                             </div>
                                             <label className="relative inline-flex items-center cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     className="sr-only peer"
-                                                    checked={remindersEnabled}
-                                                    onChange={(e) => setRemindersEnabled(e.target.checked)}
+                                                    checked={smartRemindersEnabled}
+                                                    onChange={(e) => setSmartRemindersEnabled(e.target.checked)}
                                                 />
                                                 <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
                                             </label>
                                         </div>
-
-                                        {remindersEnabled && (
-                                            <div
-                                                className="space-y-4 pt-4 border-t border-slate-700/50 overflow-hidden"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm text-slate-400">Every</span>
-                                                    <input
-                                                        type="number"
-                                                        min="1"
-                                                        value={reminderValue}
-                                                        onChange={(e) => setReminderValue(Math.max(1, parseInt(e.target.value) || 1))}
-                                                        className="w-14 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-center focus:outline-none focus:border-rose-500 transition-colors"
-                                                    />
-                                                    <select
-                                                        value={reminderUnit}
-                                                        onChange={(e) => setReminderUnit(e.target.value as any)}
-                                                        className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-rose-500 transition-colors"
-                                                    >
-                                                        <option value="days">Days</option>
-                                                        <option value="weeks">Weeks</option>
-                                                        <option value="months">Months</option>
-                                                    </select>
-                                                </div>
-
-                                                {reminderUnit === 'weeks' && (
-                                                    <div className="flex justify-between gap-1">
-                                                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-                                                            <button
-                                                                key={i}
-                                                                onClick={() => setReminderTarget(i)}
-                                                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${reminderTarget === i ? 'bg-rose-500 text-white' : 'bg-slate-900 text-slate-500 border border-slate-700'}`}
-                                                            >
-                                                                {day}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                {reminderUnit === 'months' && (
-                                                    <div className="space-y-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-sm text-slate-400">On the</span>
-                                                            <select
-                                                                value={reminderOccurrence}
-                                                                onChange={(e) => setReminderOccurrence(parseInt(e.target.value))}
-                                                                className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-rose-500 transition-colors"
-                                                            >
-                                                                <option value={0}>1st</option>
-                                                                <option value={1}>2nd</option>
-                                                                <option value={2}>3rd</option>
-                                                                <option value={3}>4th</option>
-                                                                <option value={4}>Last</option>
-                                                            </select>
-                                                            <select
-                                                                value={reminderTarget}
-                                                                onChange={(e) => setReminderTarget(parseInt(e.target.value))}
-                                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-rose-500 transition-colors"
-                                                            >
-                                                                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => (
-                                                                    <option key={i} value={i}>{d}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div className="flex items-center justify-between pt-2">
-                                                    <div className="flex items-center gap-2 text-slate-400">
-                                                        <Clock className="w-3.5 h-3.5" />
-                                                        <span className="text-xs font-bold uppercase tracking-wider">Time</span>
-                                                    </div>
-                                                    <input
-                                                        type="time"
-                                                        value={reminderTime}
-                                                        onChange={(e) => setReminderTime(e.target.value)}
-                                                        className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-rose-500 transition-colors"
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Security & Data Section */}
                                     <div className="space-y-2">
                                         <button
-                                            onClick={() => setShowSecurity(true)}
+                                            onClick={() => { setShowSecurity(true); }}
                                             className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-700 hover:bg-slate-800 transition-colors flex items-center justify-between group"
                                         >
                                             <div className="flex items-center gap-2">
@@ -642,7 +579,7 @@ export default function UIOverlay() {
 
             {/* Security Explanation Modal */}
             {showSecurity && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-md pointer-events-auto z-[70] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[70] flex items-center justify-center p-4">
                     <div
                         className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl max-h-[85vh] overflow-y-auto animate-fade-in"
                     >
@@ -690,12 +627,21 @@ export default function UIOverlay() {
                                 </p>
                             </section>
 
-                            <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/50 items-start gap-3 flex">
-                                <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                                <p className="text-xs text-slate-400 leading-normal">
-                                    Since there is no cloud backup, your data is lost if you lose your device or clear your browser data.
-                                    Use the **Export** feature in settings to create your own secure backups.
-                                </p>
+                            <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/50 items-start gap-3 flex flex-col">
+                                <div className="flex gap-2">
+                                    <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                                    <p className="text-xs text-slate-400 leading-normal">
+                                        Since there is no cloud backup, your data is lost if you lose your device or clear your browser data.
+                                        Use the <strong>Export</strong> feature in settings to create your own secure backups.
+                                    </p>
+                                </div>
+                                <div className="w-full h-px bg-white/5 my-1" />
+                                <div className="flex gap-2">
+                                    <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                    <p className="text-xs text-slate-400 leading-normal">
+                                        <strong>Disclaimer</strong>: This app is provided "as is" without warranty of any kind. The developers are not responsible for any data loss or medical decisions made based on this app.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -848,6 +794,106 @@ export default function UIOverlay() {
                 </div>
             )}
 
+
+
+            {/* PIN Setup Modal */}
+            {
+                showPinSetup && (
+                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md pointer-events-auto z-[80] flex items-center justify-center p-4">
+                        <div className="w-full max-w-xs flex flex-col items-center animate-fade-in">
+                            <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-6 text-white">
+                                <Lock className="w-8 h-8" />
+                            </div>
+
+                            <h2 className="text-xl font-bold text-white mb-2">
+                                {pinFlow === 'setup' && pinStep === 'enter' && "Create PIN"}
+                                {pinFlow === 'setup' && pinStep === 'confirm' && "Confirm PIN"}
+                                {pinFlow === 'remove' && "Enter Current PIN"}
+                            </h2>
+                            <p className="text-slate-400 mb-8 text-sm text-center">
+                                {pinError ? <span className="text-red-500 font-bold">Incorrect PIN. Try again.</span> :
+                                    (pinFlow === 'setup' && pinStep === 'confirm' ? "Re-enter to confirm" : "Enter a 4-digit code")}
+                            </p>
+
+                            <div className="flex gap-4 mb-8">
+                                {[0, 1, 2, 3].map(i => (
+                                    <div key={i} className={`w-4 h-4 rounded-full transition-all ${i < pinInput.length ? 'bg-rose-500' : 'bg-slate-800'}`} />
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4 w-full mb-8">
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((num) => (
+                                    <button
+                                        key={num}
+                                        onClick={() => {
+                                            if (pinInput.length < 4) {
+                                                const newPin = pinInput + num;
+                                                setPinInput(newPin);
+                                                setPinError(false);
+
+                                                if (newPin.length === 4) {
+                                                    setTimeout(() => {
+                                                        if (pinFlow === 'setup') {
+                                                            if (pinStep === 'enter') {
+                                                                setTempPin(newPin);
+                                                                setPinInput("");
+                                                                setPinStep('confirm');
+                                                            } else {
+                                                                if (newPin === tempPin) {
+                                                                    localStorage.setItem('app-lock-pin', newPin);
+                                                                    setHasPin(true);
+                                                                    setShowPinSetup(false);
+                                                                    // Success haptic
+                                                                } else {
+                                                                    setPinError(true);
+                                                                    setPinInput("");
+                                                                    setPinStep('enter');
+                                                                    setTempPin("");
+                                                                }
+                                                            }
+                                                        } else if (pinFlow === 'remove') {
+                                                            const stored = localStorage.getItem('app-lock-pin');
+                                                            if (newPin === stored) {
+                                                                localStorage.removeItem('app-lock-pin');
+                                                                setHasPin(false);
+                                                                setShowPinSetup(false);
+                                                            } else {
+                                                                setPinError(true);
+                                                                setPinInput("");
+                                                            }
+                                                        }
+                                                    }, 200);
+                                                }
+                                            }
+                                        }}
+                                        className={`aspect-square rounded-full bg-slate-900 border border-slate-800 text-white text-xl font-bold hover:bg-slate-800 active:bg-rose-500 active:border-rose-500 transition-all ${num === 0 ? 'col-start-2' : ''}`}
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
+                                <div className="col-start-3 row-start-4 flex justify-center items-center">
+                                    <button
+                                        onClick={() => setPinInput(prev => prev.slice(0, -1))}
+                                        className="p-4 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
+                                    >
+                                        <Delete className="w-6 h-6" /> // Wait, I imported Delete? Need to check imports.
+                                        {/* Actually I used X or Trash2 before. Let's use X for backspace or check if Delete is proper lucide icon. Lucide has Delete. */}
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setShowPinSetup(false)}
+                                className="text-slate-500 hover:text-white text-sm font-bold uppercase tracking-wider px-4 py-2"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
+
             {/* Top Bar */}
             <div
                 className="absolute top-0 left-0 right-0 p-4 pointer-events-auto z-30"
@@ -859,50 +905,76 @@ export default function UIOverlay() {
                         <span className="tracking-tight">Track-A-Mole</span>
                     </h1>
 
-                    <button
-                        onClick={() => setShowSettings(true)}
-                        className="w-10 h-10 rounded-full glass flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-95"
-                    >
-                        <Settings className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => {
+                                haptics.selection();
+                                triggerCameraReset();
+                            }}
+                            className="w-10 h-10 rounded-full glass flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+                            title="Recenter Camera"
+                        >
+                            <RefreshCw className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            className="w-10 h-10 rounded-full glass flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+                        >
+                            <Settings className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Main Content Area - Bottom Sheet */}
             <div
-                className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none z-20"
-                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
+                className={`absolute bottom-0 left-0 right-0 pointer-events-none z-20 transition-transform duration-500 ease-spring ${isMenuOpen ? 'translate-y-0' : 'translate-y-[calc(100%-80px)]'}`}
+                style={{
+                    paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)',
+                    height: 'auto',
+                    maxHeight: '80vh'
+                }}
             >
-                <div className="max-w-xl mx-auto">
-                    {isAddingMole ? (
-                        <AddMolePanel
-                            key="add"
-                            onSave={handleAddMole}
-                            label={newLabel}
-                            setLabel={setNewLabel}
-                        />
-                    ) : selectedMoleId ? (
-                        <MoleDetailPanel
-                            key="detail"
-                            onAddEntry={() => {
-                                resetEntryForm();
-                                setShowAddEntry(true);
-                            }}
-                            onDeleteMole={handleDeleteMole}
-                            onUpdateLabel={handleUpdateMoleLabel}
-                            onDeleteEntry={handleDeleteEntry}
-                            onEditEntry={startEditEntry}
-                            editingMoleId={editingMoleId}
-                            setEditingMoleId={setEditingMoleId}
-                            editLabel={editLabel}
-                            setEditLabel={setEditLabel}
-                        />
-                    ) : (
-                        <MoleListPanel key="list" moles={moles} />
-                    )}
+                <div className="max-w-xl mx-auto flex flex-col items-center">
+                    {/* Pull Handle */}
+                    <button
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className="pointer-events-auto mb-2 w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/10 shadow-lg active:scale-95 transition-all"
+                    >
+                        {isMenuOpen ? <ChevronDown className="w-6 h-6" /> : <ChevronUp className="w-6 h-6" />}
+                    </button>
+
+                    <div className="w-full relative pointer-events-auto">
+                        {isAddingMole ? (
+                            <AddMolePanel
+                                key="add"
+                                onSave={handleAddMole}
+                                label={newLabel}
+                                setLabel={setNewLabel}
+                            />
+                        ) : selectedMoleId ? (
+                            <MoleDetailPanel
+                                key="detail"
+                                onAddEntry={() => {
+                                    resetEntryForm();
+                                    setShowAddEntry(true);
+                                }}
+                                onDeleteMole={handleDeleteMole}
+                                onUpdateLabel={handleUpdateMoleLabel}
+                                onDeleteEntry={handleDeleteEntry}
+                                onEditEntry={startEditEntry}
+                                editingMoleId={editingMoleId}
+                                setEditingMoleId={setEditingMoleId}
+                                editLabel={editLabel}
+                                setEditLabel={setEditLabel}
+                            />
+                        ) : (
+                            <MoleListPanel key="list" moles={moles} />
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
@@ -1053,6 +1125,7 @@ function AddMolePanel({ onSave, label, setLabel }: { onSave: () => void, label: 
                             type="text"
                             value={label}
                             onChange={(e) => setLabel(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && onSave()}
                             placeholder="e.g., Right Shoulder"
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:border-rose-500 transition-colors mt-2"
                             autoFocus

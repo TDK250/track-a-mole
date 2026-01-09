@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Canvas } from "@react-three/fiber";
@@ -14,18 +15,15 @@ export default function ThreeScene() {
     return (
         <div id="canvas-container" className="bg-[#020617]">
             <Canvas key={gender} shadows={false} dpr={[1, 1.5]}>
-                {/* 
-                   Using a slightly higher FOV and moving the camera further back (position Z: 5)
-                   ensures that the model stays in frame even on narrow or wide viewports.
-                */}
-                <PerspectiveCamera makeDefault position={[0, 0, 4]} fov={45} />
+                {/* Camera positioned closer for larger figure */}
+                <PerspectiveCamera makeDefault position={[0, 1.0, 2.8]} fov={60} />
                 <OrbitControls
-                    enablePan={false} // Disable pan for better touch control on mobile
+                    enablePan={false} // Controlled by CameraController
                     minDistance={0.5}
                     maxDistance={8}
                     minPolarAngle={0}
                     maxPolarAngle={Math.PI}
-                    target={[0, 0.3, 0]}
+                    target={[0, 1.0, 0]} // Center on torso
                     makeDefault
                 />
 

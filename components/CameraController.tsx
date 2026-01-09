@@ -7,19 +7,24 @@ import * as THREE from "three";
 import { OrbitControls } from "three-stdlib";
 
 export default function CameraController() {
-    const { camera, controls } = useThree();
+    const { camera, controls, size } = useThree();
     const selectedMoleId = useAppStore((state) => state.selectedMoleId);
+    const cameraResetTrigger = useAppStore((state) => state.cameraResetTrigger);
+    const isMenuOpen = useAppStore((state) => state.isMenuOpen);
+    const modelCenter = useAppStore((state) => state.modelCenter);
+    const modelHeight = useAppStore((state) => state.modelHeight);
+
     const selectedMole = useLiveQuery(
         () => (selectedMoleId ? db.moles.get(selectedMoleId) : undefined),
         [selectedMoleId]
     );
 
-    const targetPosition = useRef(new THREE.Vector3(0, 0.3, 0)); // Default target
-    const targetCameraPosition = useRef(new THREE.Vector3(0, 0, 4)); // Default camera pos
+    const targetPosition = useRef(new THREE.Vector3(0, 1.0, 0));
+    const targetCameraPosition = useRef(new THREE.Vector3(0, 1.0, 4));
 
     const isFocusing = useRef(false);
 
-    // Add event listener to stop auto-focus on user interaction
+    // Initial setup and interaction listener
     useEffect(() => {
         const orbitControls = controls as unknown as OrbitControls;
         if (!orbitControls) return;
@@ -29,75 +34,102 @@ export default function CameraController() {
         };
 
         orbitControls.addEventListener("start", onStart);
+
+        // Ensure panning is enabled and axis is locked to screen space for intuitive move
+        orbitControls.enablePan = true;
+        orbitControls.screenSpacePanning = true;
+        orbitControls.panSpeed = 1.2;
+
         return () => {
             orbitControls.removeEventListener("start", onStart);
         };
     }, [controls]);
 
+    // Handle Framing Logic
     useEffect(() => {
+        const orbitControls = controls as unknown as OrbitControls;
+        if (!orbitControls) return;
+
+        // Clear any old view offsets that might still be active from previous implementation
+        (camera as THREE.PerspectiveCamera).clearViewOffset();
+        (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+
         if (selectedMole && selectedMole.position) {
-            // If mole is selected, focus on it
+            // MOLE FOCUS MODE
             const [x, y, z] = selectedMole.position;
             targetPosition.current.set(x, y, z);
 
-            // Calculate ideal camera position
-            // We want to face the mole directly, avoiding steep top-down angles.
-            // Project the direction vector onto the XZ plane to get a horizontal viewing angle.
             const molePos = new THREE.Vector3(x, y, z);
-            const viewDir = new THREE.Vector3(x, 0, z).normalize();
 
-            // Handle edge case where mole is perfectly on the Y axis (unlikely)
+            // PRIORITY: Use surface normal for "head-on" view
+            let viewDir = new THREE.Vector3();
+            if (selectedMole.normal) {
+                viewDir.set(...selectedMole.normal);
+            } else {
+                // Fallback for old data or missing normals
+                const baseCenter = new THREE.Vector3(...modelCenter);
+                viewDir.subVectors(molePos, baseCenter);
+                viewDir.y = 0; // Keep horizontal
+            }
+
+            viewDir.normalize();
             if (viewDir.lengthSq() < 0.001) viewDir.set(0, 0, 1);
 
-            // Position camera further out for a better view (2.5 units) to avoid feeling "too close"
-            const camPos = molePos.clone().add(viewDir.multiplyScalar(2.5));
-            // Ensure camera is at least at eye level with the mole, maybe slightly offset? 
-            // Keeping it same Y level as mole is usually best for "straight on" view.
-
+            // Position camera closer (1.2 units) for detail
+            const camPos = molePos.clone().add(viewDir.multiplyScalar(1.2));
             targetCameraPosition.current.copy(camPos);
 
             isFocusing.current = true;
         } else {
-            // Reset to full body view
-            const newTarget = new THREE.Vector3(0, 0.3, 0);
-            targetPosition.current.copy(newTarget);
+            // FULL BODY / RESET MODE
+            const baseCenter = new THREE.Vector3(...modelCenter);
 
-            // Instead of resetting to a fixed "front" view (which causes the camera to fly THROUGH the body if you're behind it),
-            // we preserves the current viewing angle but zoom out to a comfortable distance.
-            // This ensures a smooth "pull back" animation that never clips the model.
+            // Calculate vertical shift to center the model in the visible top area
+            const panelSizeRatio = isMenuOpen ? 320 / size.height : 0.15;
+            const verticalShift = panelSizeRatio * 0.8;
 
-            // Vector from new target to current camera
-            const direction = new THREE.Vector3().subVectors(camera.position, newTarget).normalize();
+            const visualCenter = baseCenter.clone();
+            visualCenter.y += verticalShift;
 
-            // If we get zero length (camera exactly at target), default to front view
+            targetPosition.current.copy(visualCenter);
+
+            // Calculate ideal distance to fit head-to-toe
+            const fovRad = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
+            const availableHeightRatio = 1 - panelSizeRatio;
+
+            const margin = 1.1;
+            let idealDistance = (modelHeight * margin) / (2 * Math.tan(fovRad / 2));
+            idealDistance = idealDistance / availableHeightRatio;
+
+            // CRITICAL FIX: To prevent compounding tilt, we MUST use a horizontal direction vector
+            // Calculate direction from baseCenter (not visualCenter) to camera
+            const direction = new THREE.Vector3().subVectors(camera.position, baseCenter);
+            direction.y = 0; // NEUTRALIZE VERTICAL TILT
+            direction.normalize();
             if (direction.lengthSq() < 0.001) direction.set(0, 0, 1);
 
-            // Set camera at distance 4 from target along the same direction
-            const newCamPos = newTarget.clone().add(direction.multiplyScalar(4));
+            // Place camera at horizontal idealDistance away from visualCenter
+            const newCamPos = visualCenter.clone().add(direction.multiplyScalar(idealDistance));
             targetCameraPosition.current.copy(newCamPos);
 
             isFocusing.current = true;
         }
-    }, [selectedMole]);
+    }, [selectedMole, cameraResetTrigger, isMenuOpen, modelCenter, modelHeight, camera, size.height, size.width, controls]);
 
     useFrame((state, delta) => {
         const orbitControls = controls as unknown as OrbitControls;
         if (!orbitControls) return;
 
-        // Smoothly interpolate target
-        // Reduced speed from 4 -> 2.5 to make it less jarring/fast
-        const step = 2.5 * delta; // Speed
-
-        // Only lerp target if we haven't reached it effectively, or just always lerp (it's fine)
-        // Note: OrbitControls updates target on pan, but pan is disabled.
-        orbitControls.target.lerp(targetPosition.current, step);
+        const step = 3.0 * delta;
 
         if (isFocusing.current) {
+            orbitControls.target.lerp(targetPosition.current, step);
             state.camera.position.lerp(targetCameraPosition.current, step);
 
-            // Check if close enough to stop focusing
             const dist = state.camera.position.distanceTo(targetCameraPosition.current);
-            if (dist < 0.05) {
+            const targetDist = orbitControls.target.distanceTo(targetPosition.current);
+
+            if (dist < 0.01 && targetDist < 0.01) {
                 isFocusing.current = false;
             }
         }

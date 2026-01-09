@@ -1,2 +1,0 @@
-To https://github.com/TDK250/track-a-mole.git
-   ea77c77..57cb155  main -> main

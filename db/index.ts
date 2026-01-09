@@ -5,6 +5,7 @@ export interface Mole {
     label: string;
     gender: 'male' | 'female';
     position: [number, number, number]; // [x, y, z] in 3D space
+    normal?: [number, number, number];   // [x, y, z] surface normal
     createdAt: number;
 }
 
@@ -27,7 +28,7 @@ export class AppDatabase extends Dexie {
 
     constructor() {
         super('TrackAMoleDB');
-        this.version(2).stores({
+        this.version(3).stores({
             moles: '++id, label, gender',
             entries: '++id, moleId, date'
         });

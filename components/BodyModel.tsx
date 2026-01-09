@@ -15,6 +15,8 @@ export default function BodyModel() {
     const modelPath = gender === "male" ? getAssetPath("/models/male.glb") : getAssetPath("/models/female.glb");
     const { scene } = useGLTF(modelPath);
 
+    const setModelGeometry = useAppStore((state: AppState) => state.setModelGeometry);
+
     // Use useMemo to clone the scene so we don't modify the cached GLTF object directly
     const clonedScene = useMemo(() => {
         const clone = scene.clone();
@@ -43,11 +45,33 @@ export default function BodyModel() {
         return clone;
     }, [scene]);
 
+    // Report final geometry to store after layout
+    useLayoutEffect(() => {
+        const box = new THREE.Box3().setFromObject(clonedScene);
+        const center = new THREE.Vector3();
+        const size = new THREE.Vector3();
+        box.getCenter(center);
+        box.getSize(size);
+        setModelGeometry([center.x, center.y, center.z], size.y);
+    }, [clonedScene, setModelGeometry]);
+
     const handleBodyClick = (e: any) => {
         e.stopPropagation();
         if (!isAddingMole) return;
 
-        const { point } = e;
+        const { point, face, object } = e;
+
+        // Capture normal if available
+        if (face && face.normal && object) {
+            // The face normal is in local coordinates. 
+            // We need to transform it to world space.
+            const worldNormal = face.normal.clone();
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(object.matrixWorld);
+            worldNormal.applyMatrix3(normalMatrix).normalize();
+
+            useAppStore.getState().setTempMoleNormal([worldNormal.x, worldNormal.y, worldNormal.z]);
+        }
+
         useAppStore.getState().setTempMolePosition([point.x, point.y, point.z]);
     };
 

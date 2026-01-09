@@ -2,8 +2,11 @@
 
 import ThreeScene from "@/components/ThreeScene";
 import UIOverlay from "@/components/UIOverlay";
+import { useAppStore, type AppState } from "@/store/appStore";
 
 export default function Home() {
+    const isMenuOpen = useAppStore((state: AppState) => state.isMenuOpen);
+
     return (
         <main className="relative w-screen h-screen overflow-hidden">
             {/* 3D Background */}

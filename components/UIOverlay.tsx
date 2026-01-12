@@ -10,18 +10,33 @@ import { haptics } from "@/utils/haptics";
 import { useState, useEffect, useRef } from "react";
 import { NotificationService } from "@/services/notificationService";
 import { ImportExportService } from "@/services/importExportService";
+import { motion, useMotionValue, useTransform, PanInfo, useAnimation } from "framer-motion";
+import TutorialOverlay from "./TutorialOverlay";
 
 export default function UIOverlay() {
-    const {
-        gender, setGender,
-        isAddingMole, setIsAddingMole,
-        selectedMoleId, setSelectedMoleId,
-        tempMolePosition, setTempMolePosition,
-        tempMoleNormal, setTempMoleNormal,
-        smartRemindersEnabled, setSmartRemindersEnabled,
-        triggerCameraReset,
-        isMenuOpen, setIsMenuOpen
-    } = useAppStore();
+    const gender = useAppStore((s) => s.gender);
+    const isAddingMole = useAppStore((s) => s.isAddingMole);
+    const selectedMoleId = useAppStore((s) => s.selectedMoleId);
+    const isMenuOpen = useAppStore((s) => s.isMenuOpen);
+    const setIsMenuOpen = useAppStore((s) => s.setIsMenuOpen);
+    const setMenuHeight = useAppStore((s) => s.setMenuHeight);
+    const smartRemindersEnabled = useAppStore((s) => s.smartRemindersEnabled);
+    const tempMolePosition = useAppStore((s) => s.tempMolePosition);
+    const tempMoleNormal = useAppStore((s) => s.tempMoleNormal);
+
+    // Actions - using getState to avoid subscription where possible or just destructuring stable actions
+    const setGender = useAppStore((s) => s.setGender);
+    const setIsAddingMole = useAppStore((s) => s.setIsAddingMole);
+    const setSelectedMoleId = useAppStore((s) => s.setSelectedMoleId);
+    const setTempMolePosition = useAppStore((s) => s.setTempMolePosition);
+    const setTempMoleNormal = useAppStore((s) => s.setTempMoleNormal);
+    const triggerCameraReset = useAppStore((s) => s.triggerCameraReset);
+    const setSmartRemindersEnabled = useAppStore((s) => s.setSmartRemindersEnabled);
+    const hasCompletedTutorial = useAppStore((s) => s.tutorialStep === 0 && typeof window !== 'undefined' && localStorage.getItem('tutorial-completed') === 'true');
+    const tutorialStep = useAppStore((s) => s.tutorialStep);
+    const setTutorialStep = useAppStore((s) => s.setTutorialStep);
+
+    // Moles data (moved to lower declaration with filter)
     const [newLabel, setNewLabel] = useState("");
     const [showSettings, setShowSettings] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
@@ -75,7 +90,13 @@ export default function UIOverlay() {
         // Check for App Lock
         const savedPin = localStorage.getItem('app-lock-pin');
         setHasPin(!!savedPin);
-    }, []);
+
+        // Check Tutorial (if not onboarding)
+        const tutorialDone = localStorage.getItem('tutorial-completed');
+        if (!tutorialDone && !showOnboarding) {
+            setTutorialStep(1);
+        }
+    }, [showOnboarding]);
 
     // Handle Notification Scheduling
     useEffect(() => {
@@ -147,6 +168,8 @@ export default function UIOverlay() {
         localStorage.setItem('gender-selected', 'true');
         localStorage.setItem('gender-value', selectedGender);
         setShowOnboarding(false);
+        // Start tutorial after onboarding
+        setTimeout(() => setTutorialStep(1), 500);
     };
 
     const handleResetData = async () => {
@@ -1012,25 +1035,113 @@ export default function UIOverlay() {
                 </div>
             </div>
 
+
             {/* Main Content Area - Bottom Sheet */}
+            <TutorialOverlay />
+            <DraggableBottomSheet
+                isMenuOpen={isMenuOpen}
+                setIsMenuOpen={setIsMenuOpen}
+                isAddingMole={isAddingMole}
+                selectedMoleId={selectedMoleId}
+                handleAddMole={handleAddMole}
+                newLabel={newLabel}
+                setNewLabel={setNewLabel}
+                moles={moles}
+                handleDeleteMole={handleDeleteMole}
+                handleUpdateMoleLabel={handleUpdateMoleLabel}
+                handleDeleteEntry={handleDeleteEntry}
+                startEditEntry={startEditEntry}
+                editingMoleId={editingMoleId}
+                setEditingMoleId={setEditingMoleId}
+                editLabel={editLabel}
+                setEditLabel={setEditLabel}
+                setShowAddEntry={setShowAddEntry}
+                resetEntryForm={resetEntryForm}
+                setMenuHeight={setMenuHeight}
+            />
+        </div >
+    );
+}
+
+function DraggableBottomSheet({
+    isMenuOpen, setIsMenuOpen, isAddingMole, selectedMoleId,
+    handleAddMole, newLabel, setNewLabel, moles,
+    handleDeleteMole, handleUpdateMoleLabel, handleDeleteEntry,
+    startEditEntry, editingMoleId, setEditingMoleId, editLabel, setEditLabel,
+    setShowAddEntry, resetEntryForm, setMenuHeight
+}: any) {
+    const controls = useAnimation();
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [contentHeight, setContentHeight] = useState(500); // Approximate default
+    const dragY = useMotionValue(0);
+
+    // Update content height when content changes
+    useEffect(() => {
+        if (containerRef.current) {
+            setContentHeight(containerRef.current.offsetHeight);
+        }
+    }, [isAddingMole, selectedMoleId, moles, editingMoleId]);
+
+    // Handle open/close state changes driven by store (e.g. clicking the chevron or selecting a mole)
+    useEffect(() => {
+        const targetY = isMenuOpen ? 0 : contentHeight - 110; // 110px peek (enough for pull handle + header)
+        controls.start({ y: targetY, transition: { type: "spring", stiffness: 300, damping: 30 } });
+    }, [isMenuOpen, controls, contentHeight]);
+
+    // Sync menu height for 3D model centering
+    useEffect(() => {
+        const unsubscribe = dragY.on("change", (latestY) => {
+            const visibleHeight = Math.max(80, contentHeight - latestY);
+            setMenuHeight(visibleHeight);
+        });
+        return () => unsubscribe();
+    }, [dragY, contentHeight, setMenuHeight]);
+
+    const isDragDisabled = isAddingMole || selectedMoleId;
+
+    const handleDragEnd = (_: any, info: PanInfo) => {
+        if (isDragDisabled) return;
+        const threshold = contentHeight / 4;
+        const velocityThreshold = 200;
+
+        // Determine if we should snap to open or closed
+        let shouldOpen = isMenuOpen;
+
+        if (info.offset.y > threshold || info.velocity.y > velocityThreshold) {
+            shouldOpen = false; // Dragged down significantly
+        } else if (info.offset.y < -threshold || info.velocity.y < -velocityThreshold) {
+            shouldOpen = true; // Dragged up significantly
+        }
+
+        setIsMenuOpen(shouldOpen);
+        // The useEffect above will trigger the animation
+    };
+
+    return (
+        <motion.div
+            ref={containerRef}
+            drag={isDragDisabled ? false : "y"}
+            dragConstraints={{ top: 0, bottom: contentHeight - 80 }}
+            dragElastic={0.1}
+            onDragEnd={handleDragEnd}
+            animate={controls}
+            style={{ y: dragY }}
+            className="absolute bottom-0 left-0 right-0 z-20 bg-transparent pointer-events-auto"
+        >
             <div
-                className={`absolute bottom-0 left-0 right-0 pointer-events-none z-20 transition-transform duration-500 ease-spring ${isMenuOpen ? 'translate-y-0' : 'translate-y-[calc(100%-80px)]'}`}
+                className="w-full relative bg-transparent"
                 style={{
                     paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)',
-                    height: 'auto',
-                    maxHeight: '80vh'
                 }}
             >
                 <div className="max-w-xl mx-auto flex flex-col items-center">
-                    {/* Pull Handle */}
-                    <button
-                        onClick={() => setIsMenuOpen(!isMenuOpen)}
-                        className="pointer-events-auto mb-2 w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/10 shadow-lg active:scale-95 transition-all"
-                    >
-                        {isMenuOpen ? <ChevronDown className="w-6 h-6" /> : <ChevronUp className="w-6 h-6" />}
-                    </button>
+                    {/* Pull Handle Area - Always visible & Draggable trigger */}
+                    <div className={`w-full flex justify-center -mb-6 relative z-10 pt-4 cursor-grab active:cursor-grabbing pb-2 ${isDragDisabled ? 'opacity-0 pointer-events-none' : ''}`}>
+                        {/* Simple Handle Bar */}
+                        <div className="w-12 h-1.5 bg-white/20 rounded-full" />
+                    </div>
 
-                    <div className="w-full relative pointer-events-auto">
+                    <div className="w-full pt-8">
                         {isAddingMole ? (
                             <AddMolePanel
                                 key="add"
@@ -1060,7 +1171,7 @@ export default function UIOverlay() {
                     </div>
                 </div>
             </div>
-        </div >
+        </motion.div>
     );
 }
 

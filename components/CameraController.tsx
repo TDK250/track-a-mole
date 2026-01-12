@@ -13,6 +13,7 @@ export default function CameraController() {
     const isMenuOpen = useAppStore((state) => state.isMenuOpen);
     const modelCenter = useAppStore((state) => state.modelCenter);
     const modelHeight = useAppStore((state) => state.modelHeight);
+    const menuHeight = useAppStore((state) => state.menuHeight);
 
     const selectedMole = useLiveQuery(
         () => (selectedMoleId ? db.moles.get(selectedMoleId) : undefined),
@@ -85,11 +86,14 @@ export default function CameraController() {
             const baseCenter = new THREE.Vector3(...modelCenter);
 
             // Calculate vertical shift to center the model in the visible top area
-            const panelSizeRatio = isMenuOpen ? 320 / size.height : 0.15;
+            // Use real-time menuHeight from store for smooth transition during drag
+            const panelSizeRatio = menuHeight / size.height;
             const verticalShift = panelSizeRatio * 0.8;
 
             const visualCenter = baseCenter.clone();
-            visualCenter.y += verticalShift;
+            // Subtracting shift moves the camera target DOWN, which makes the model appear HIGHER in the viewport.
+            // This centers the model in the visible area above the menu.
+            visualCenter.y -= verticalShift;
 
             targetPosition.current.copy(visualCenter);
 
@@ -99,6 +103,7 @@ export default function CameraController() {
 
             const margin = 1.1;
             let idealDistance = (modelHeight * margin) / (2 * Math.tan(fovRad / 2));
+            // Re-enabled shrinking/zooming to fit the available height
             idealDistance = idealDistance / availableHeightRatio;
 
             // CRITICAL FIX: To prevent compounding tilt, we MUST use a horizontal direction vector
@@ -114,7 +119,7 @@ export default function CameraController() {
 
             isFocusing.current = true;
         }
-    }, [selectedMole, cameraResetTrigger, isMenuOpen, modelCenter, modelHeight, camera, size.height, size.width, controls]);
+    }, [selectedMole, cameraResetTrigger, isMenuOpen, menuHeight, modelCenter, modelHeight, camera, size.height, size.width, controls]);
 
     useFrame((state, delta) => {
         const orbitControls = controls as unknown as OrbitControls;

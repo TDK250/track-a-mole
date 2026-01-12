@@ -28,6 +28,15 @@ export interface AppState {
     modelCenter: [number, number, number];
     modelHeight: number;
     setModelGeometry: (center: [number, number, number], height: number) => void;
+
+    // Menu State
+    menuHeight: number;
+    setMenuHeight: (height: number) => void;
+
+    // Tutorial State
+    tutorialStep: number; // 0=none, 1=welcome, 2=camera, 3=add, 4=menu
+    setTutorialStep: (step: number) => void;
+    completeTutorial: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => {
@@ -35,6 +44,7 @@ export const useAppStore = create<AppState>((set) => {
     const isClient = typeof window !== 'undefined';
     const savedGender = isClient ? localStorage.getItem('gender-value') as 'male' | 'female' | null : null;
     const savedSmartReminders = isClient ? localStorage.getItem('smart-reminders-enabled') !== 'false' : true; // Default true
+    const hasCompletedTutorial = isClient ? localStorage.getItem('tutorial-completed') === 'true' : false;
 
     return {
         gender: savedGender || 'male',
@@ -70,6 +80,17 @@ export const useAppStore = create<AppState>((set) => {
         modelCenter: [0, 1.0, 0],
         modelHeight: 1.5,
         setModelGeometry: (center, height) => set({ modelCenter: center, modelHeight: height }),
+
+        // Menu State
+        menuHeight: 80, // Default closed height (approx)
+        setMenuHeight: (height) => set({ menuHeight: height }),
+
+        // Tutorial
+        tutorialStep: 0, // Default to 0, logic in UIOverlay will trigger step 1 if needed
+        setTutorialStep: (step) => set({ tutorialStep: step }),
+        completeTutorial: () => {
+            set({ tutorialStep: 0 });
+            if (isClient) localStorage.setItem('tutorial-completed', 'true');
+        }
     };
 });
-

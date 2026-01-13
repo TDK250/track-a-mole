@@ -1,13 +1,26 @@
 "use client";
 
 import { useAppStore, type AppState } from "@/store/appStore";
-import { Plus, X, Check, MapPin, Calendar, ChevronRight, Settings, AlertTriangle, Camera, Trash2, Edit3, Bell, Clock, Lock, ShieldCheck, Download, Upload, Eye, EyeOff, Info, RefreshCw, ChevronUp, ChevronDown, Delete } from "lucide-react";
+import {
+    Camera, Calendar, MapPin, Search, ChevronRight, Plus, X,
+    Trash2, Edit3, Settings, Shield, Lock, Unlock, Download, Upload, RefreshCw,
+    Check, ArrowUpDown, SortAsc, SortDesc, ArrowLeftRight, Bell, ShieldCheck,
+    AlertTriangle, Eye, EyeOff, Info, Delete
+} from "lucide-react";
 import { Camera as CapCamera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/db";
 import { haptics } from "@/utils/haptics";
 
-import { useState, useEffect, useRef } from "react";
+const ABCDE_ITEMS = [
+    { letter: 'A', title: 'Asymmetry', desc: 'One half of the mole does not match the other half.' },
+    { letter: 'B', title: 'Border', desc: 'The edges are irregular, ragged, notched, or blurred.' },
+    { letter: 'C', title: 'Color', desc: 'The color is not the same all over and may include shades of brown/black.' },
+    { letter: 'D', title: 'Diameter', desc: 'The spot is larger than 6mm (about the size of a pencil eraser).' },
+    { letter: 'E', title: 'Evolving', desc: 'The mole is changing in size, shape, or color over time.' }
+];
+
+import { useState, useEffect, useRef, useMemo } from "react";
 import { NotificationService } from "@/services/notificationService";
 import { ImportExportService } from "@/services/importExportService";
 import { motion, useMotionValue, useTransform, PanInfo, useAnimation } from "framer-motion";
@@ -42,7 +55,10 @@ export default function UIOverlay() {
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [showAddEntry, setShowAddEntry] = useState(false);
-
+    const sortMode = useAppStore((s) => s.sortMode);
+    const sortDirection = useAppStore((s) => s.sortDirection);
+    const setSortMode = useAppStore((s) => s.setSortMode);
+    const setSortDirection = useAppStore((s) => s.setSortDirection);
 
     // Security & Data State
     const [showSecurity, setShowSecurity] = useState(false);
@@ -67,6 +83,7 @@ export default function UIOverlay() {
     const [entrySize, setEntrySize] = useState("");
     const [entryTexture, setEntryTexture] = useState("");
     const [entryNotes, setEntryNotes] = useState("");
+    const [entryABCDE, setEntryABCDE] = useState<Set<string>>(new Set());
     const [entryPhoto, setEntryPhoto] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
     const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
@@ -74,7 +91,40 @@ export default function UIOverlay() {
     const [editLabel, setEditLabel] = useState("");
     const [moleToDelete, setMoleToDelete] = useState<number | null>(null);
     const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+    const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+    const [expandedMoleId, setExpandedMoleId] = useState<number | null>(null);
+    const [comparisonImageUrl, setComparisonImageUrl] = useState<string | null>(null);
+    const [showABCDEModal, setShowABCDEModal] = useState(false);
+    const [abcdeChecked, setAbcdeChecked] = useState<Set<string>>(new Set());
+
     const moles = useLiveQuery(() => db.moles.where('gender').equals(gender).toArray(), [gender]);
+    const allEntries = useLiveQuery(() => db.entries.toArray()) || [];
+
+    const sortedMoles = useMemo(() => {
+        if (!moles) return [];
+
+        const sorted = [...moles].map(mole => {
+            const moleEntries = allEntries.filter(e => e.moleId === mole.id);
+            const lastUpdated = moleEntries.length > 0
+                ? Math.max(...moleEntries.map(e => new Date(e.date).getTime()))
+                : mole.createdAt;
+            return { ...mole, lastUpdated };
+        });
+
+        sorted.sort((a, b) => {
+            if (sortMode === 'label') {
+                return sortDirection === 'asc'
+                    ? a.label.localeCompare(b.label)
+                    : b.label.localeCompare(a.label);
+            } else {
+                return sortDirection === 'asc'
+                    ? a.lastUpdated - b.lastUpdated
+                    : b.lastUpdated - a.lastUpdated;
+            }
+        });
+
+        return sorted;
+    }, [moles, allEntries, sortMode, sortDirection]);
 
     // Check if this is first launch
     useEffect(() => {
@@ -218,6 +268,7 @@ export default function UIOverlay() {
         setEntrySize("");
         setEntryTexture("");
         setEntryNotes("");
+        setEntryABCDE(new Set());
         setEntryPhoto(null);
         setEditingEntryId(null);
     };
@@ -297,6 +348,7 @@ export default function UIOverlay() {
         setEntrySize(entry.size.toString());
         setEntryTexture(entry.texture || "");
         setEntryNotes(entry.notes || "");
+        setEntryABCDE(new Set(entry.abcde || []));
         setEntryPhoto(entry.photo || null);
         setShowAddEntry(true);
     };
@@ -310,6 +362,7 @@ export default function UIOverlay() {
             size: Math.max(0, parseFloat(entrySize) || 0),
             texture: entryTexture,
             notes: entryNotes,
+            abcde: Array.from(entryABCDE),
             photo: entryPhoto || undefined
         };
 
@@ -455,6 +508,60 @@ export default function UIOverlay() {
                                     onChange={(e) => setEntryTexture(e.target.value)}
                                     className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/50"
                                 />
+                            </div>
+
+                            {/* ABCDE Checklist - Inline Diagnostic Tool */}
+                            <div className="space-y-3 p-4 rounded-2xl bg-slate-800/30 border border-slate-700/50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">ABCDE Check</p>
+                                        <div className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/5 text-[10px] font-bold text-slate-500">
+                                            {entryABCDE.size} / 5
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowABCDEModal(true)}
+                                        className="text-[10px] font-bold text-blue-400 uppercase tracking-widest hover:text-blue-300 flex items-center gap-1.5"
+                                    >
+                                        <Info className="w-3 h-3" />
+                                        Guide
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {ABCDE_ITEMS.map((item) => {
+                                        const isChecked = entryABCDE.has(item.letter);
+                                        return (
+                                            <button
+                                                key={item.letter}
+                                                onClick={() => {
+                                                    const newSet = new Set(entryABCDE);
+                                                    if (isChecked) newSet.delete(item.letter);
+                                                    else newSet.add(item.letter);
+                                                    setEntryABCDE(newSet);
+                                                }}
+                                                className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${isChecked
+                                                    ? 'bg-rose-500/10 border-rose-500/30'
+                                                    : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black transition-colors ${isChecked ? 'bg-rose-500 text-white shadow-md' : 'bg-slate-900 text-slate-500'
+                                                        }`}>
+                                                        {isChecked ? <Check className="w-4 h-4" /> : item.letter}
+                                                    </div>
+                                                    <span className={`text-sm font-bold ${isChecked ? 'text-white' : 'text-slate-400'}`}>
+                                                        {item.title}
+                                                    </span>
+                                                </div>
+                                                {isChecked && (
+                                                    <div className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">
+                                                        Positive
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             {/* Notes */}
@@ -803,68 +910,155 @@ export default function UIOverlay() {
                     </div>
                 </div>
             )}
+            {/* ABCDE Guide Modal */}
+            {showABCDEModal && (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center p-6 animate-fade-in pointer-events-auto bg-black/60 backdrop-blur-sm"
+                    onClick={() => {
+                        setShowABCDEModal(false);
+                        setAbcdeChecked(new Set());
+                    }}
+
+                >
+                    <div
+                        className="glass bg-slate-900/90 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl backdrop-blur-3xl space-y-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xl font-bold text-white flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                    <Info className="w-5 h-5 text-blue-400" />
+                                </div>
+                                ABCDE Guide
+                            </h4>
+                            <button onClick={() => { setShowABCDEModal(false); setAbcdeChecked(new Set()); }} className="text-slate-400 hover:text-white p-2">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3 font-inter text-left">
+                            {ABCDE_ITEMS.map((item) => {
+                                const isChecked = abcdeChecked.has(item.letter);
+                                return (
+                                    <button
+                                        key={item.letter}
+                                        onClick={() => {
+                                            const newChecked = new Set(abcdeChecked);
+                                            if (isChecked) {
+                                                newChecked.delete(item.letter);
+                                            } else {
+                                                newChecked.add(item.letter);
+                                            }
+                                            setAbcdeChecked(newChecked);
+                                        }}
+                                        className={`w-full flex gap-4 p-3 rounded-2xl transition-all border text-left ${isChecked
+                                            ? 'bg-green-500/10 border-green-500/30'
+                                            : 'bg-white/5 border-transparent hover:border-white/5'
+                                            }`}
+                                    >
+                                        <div className={`w-10 h-10 rounded-xl flex flex-shrink-0 items-center justify-center text-xl font-black shadow-inner transition-colors ${isChecked
+                                            ? 'bg-green-500/20 text-green-400'
+                                            : 'bg-white/5 text-rose-500'
+                                            }`}>
+                                            {isChecked ? '✓' : item.letter}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-white text-sm">{item.title}</p>
+                                            <p className="text-slate-400 text-xs leading-relaxed">{item.desc}</p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="pt-4 border-t border-white/5 font-inter text-left">
+                            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex gap-3 text-rose-200">
+                                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                <p className="text-[10px] uppercase font-bold tracking-wider leading-relaxed">
+                                    Self-checks are for tracking only. Consult a doctor for any new or changing spots.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setShowABCDEModal(false);
+                                setAbcdeChecked(new Set());
+                            }}
+                            className="w-full py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all border border-white/10 text-sm uppercase tracking-widest"
+                        >
+                            Got it
+                        </button>
+                    </div>
+                </div>
+            )
+            }
 
             {/* Mole Deletion Confirmation */}
-            {moleToDelete && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[80] flex items-center justify-center p-4">
-                    <div
-                        className="bg-slate-900 border border-red-500/20 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-fade-in"
-                    >
-                        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-                            <Trash2 className="w-8 h-8 text-red-500" />
-                        </div>
-                        <h2 className="text-xl font-bold mb-2 text-white">Delete Mole?</h2>
-                        <p className="text-slate-400 text-sm mb-8">
-                            This will permanently delete this mole and all its check-up history. This action cannot be undone.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setMoleToDelete(null)}
-                                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDeleteMole}
-                                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
-                            >
-                                Delete
-                            </button>
+            {
+                moleToDelete && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[80] flex items-center justify-center p-4">
+                        <div
+                            className="bg-slate-900 border border-red-500/20 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-fade-in"
+                        >
+                            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                                <Trash2 className="w-8 h-8 text-red-500" />
+                            </div>
+                            <h2 className="text-xl font-bold mb-2 text-white">Delete Mole?</h2>
+                            <p className="text-slate-400 text-sm mb-8">
+                                This will permanently delete this mole and all its check-up history. This action cannot be undone.
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setMoleToDelete(null)}
+                                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDeleteMole}
+                                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
+                                >
+                                    Delete
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Entry Deletion Confirmation */}
-            {entryToDelete && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[80] flex items-center justify-center p-4">
-                    <div
-                        className="bg-slate-900 border border-red-500/20 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-fade-in"
-                    >
-                        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-                            <AlertTriangle className="w-8 h-8 text-red-400" />
-                        </div>
-                        <h2 className="text-xl font-bold mb-2 text-white">Remove Entry?</h2>
-                        <p className="text-slate-400 text-sm mb-8">
-                            Are you sure you want to remove this check-up record?
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setEntryToDelete(null)}
-                                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDeleteEntry}
-                                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
-                            >
-                                Remove
-                            </button>
+            {
+                entryToDelete && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[80] flex items-center justify-center p-4">
+                        <div
+                            className="bg-slate-900 border border-red-500/20 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-fade-in"
+                        >
+                            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                                <AlertTriangle className="w-8 h-8 text-red-400" />
+                            </div>
+                            <h2 className="text-xl font-bold mb-2 text-white">Remove Entry?</h2>
+                            <p className="text-slate-400 text-sm mb-8">
+                                Are you sure you want to remove this check-up record?
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setEntryToDelete(null)}
+                                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDeleteEntry}
+                                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
+                                >
+                                    Remove
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
 
 
@@ -1047,7 +1241,11 @@ export default function UIOverlay() {
                 handleAddMole={handleAddMole}
                 newLabel={newLabel}
                 setNewLabel={setNewLabel}
-                moles={moles}
+                moles={sortedMoles}
+                sortMode={sortMode}
+                sortDirection={sortDirection}
+                setSortMode={setSortMode}
+                setSortDirection={setSortDirection}
                 handleDeleteMole={handleDeleteMole}
                 handleUpdateMoleLabel={handleUpdateMoleLabel}
                 handleDeleteEntry={handleDeleteEntry}
@@ -1059,7 +1257,28 @@ export default function UIOverlay() {
                 setShowAddEntry={setShowAddEntry}
                 resetEntryForm={resetEntryForm}
                 setMenuHeight={setMenuHeight}
+                onExpandImage={(url: string, moleId: number) => {
+                    setSelectedImageUrl(url);
+                    setExpandedMoleId(moleId);
+                }}
             />
+
+            {/* Expanded Image View */}
+            {
+                selectedImageUrl && (
+                    <ImageOverlay
+                        selectedImageUrl={selectedImageUrl}
+                        expandedMoleId={expandedMoleId}
+                        comparisonImageUrl={comparisonImageUrl}
+                        setComparisonImageUrl={setComparisonImageUrl}
+                        onClose={() => {
+                            setSelectedImageUrl(null);
+                            setComparisonImageUrl(null);
+                            setExpandedMoleId(null);
+                        }}
+                    />
+                )
+            }
         </div >
     );
 }
@@ -1067,29 +1286,47 @@ export default function UIOverlay() {
 function DraggableBottomSheet({
     isMenuOpen, setIsMenuOpen, isAddingMole, selectedMoleId,
     handleAddMole, newLabel, setNewLabel, moles,
+    sortMode, sortDirection, setSortMode, setSortDirection,
     handleDeleteMole, handleUpdateMoleLabel, handleDeleteEntry,
     startEditEntry, editingMoleId, setEditingMoleId, editLabel, setEditLabel,
-    setShowAddEntry, resetEntryForm, setMenuHeight
-}: any) {
+    setShowAddEntry, resetEntryForm, setMenuHeight, onExpandImage
+}: {
+    // ... other props
+    onExpandImage: (url: string, moleId: number) => void
+} & any) {
     const controls = useAnimation();
     const containerRef = useRef<HTMLDivElement>(null);
     const [contentHeight, setContentHeight] = useState(500); // Approximate default
     const dragY = useMotionValue(0);
 
-    // Update content height when content changes
+    // Use ResizeObserver for more reliable height tracking as panels switch
     useEffect(() => {
-        if (containerRef.current) {
-            setContentHeight(containerRef.current.offsetHeight);
-        }
-    }, [isAddingMole, selectedMoleId, moles, editingMoleId]);
+        if (!containerRef.current) return;
 
-    // Handle open/close state changes driven by store (e.g. clicking the chevron or selecting a mole)
+        const observer = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+                const newHeight = entry.target.scrollHeight;
+                if (newHeight > 0 && newHeight !== contentHeight) {
+                    setContentHeight(newHeight);
+                }
+            }
+        });
+
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, [contentHeight]);
+
+    // Handle open/close state changes driven by store
     useEffect(() => {
-        const targetY = isMenuOpen ? 0 : contentHeight - 110; // 110px peek (enough for pull handle + header)
-        controls.start({ y: targetY, transition: { type: "spring", stiffness: 300, damping: 30 } });
+        const targetY = isMenuOpen ? 0 : contentHeight - 110;
 
-        // IMMEDIATE SYNC: Ensure store knows the target height immediately
-        // This prevents the "jump" when model loads before drag interaction
+        // Use a slight delay for contentHeight stabilization if needed, 
+        // but spring animation handles most cases well.
+        controls.start({
+            y: targetY,
+            transition: { type: "spring", stiffness: 350, damping: 35, restDelta: 0.1 }
+        });
+
         const targetHeight = isMenuOpen ? contentHeight : 110;
         setMenuHeight(targetHeight);
     }, [isMenuOpen, controls, contentHeight, setMenuHeight]);
@@ -1103,24 +1340,21 @@ function DraggableBottomSheet({
         return () => unsubscribe();
     }, [dragY, contentHeight, setMenuHeight]);
 
-    const isDragDisabled = isAddingMole || selectedMoleId;
+    const isDragDisabled = false;
 
     const handleDragEnd = (_: any, info: PanInfo) => {
         if (isDragDisabled) return;
-        const threshold = contentHeight / 4;
-        const velocityThreshold = 200;
+        const threshold = 50; // Much more responsive threshold
+        const velocityThreshold = 100;
 
-        // Determine if we should snap to open or closed
         let shouldOpen = isMenuOpen;
-
         if (info.offset.y > threshold || info.velocity.y > velocityThreshold) {
-            shouldOpen = false; // Dragged down significantly
+            shouldOpen = false;
         } else if (info.offset.y < -threshold || info.velocity.y < -velocityThreshold) {
-            shouldOpen = true; // Dragged up significantly
+            shouldOpen = true;
         }
 
         setIsMenuOpen(shouldOpen);
-        // The useEffect above will trigger the animation
     };
 
     return (
@@ -1128,7 +1362,8 @@ function DraggableBottomSheet({
             ref={containerRef}
             drag={isDragDisabled ? false : "y"}
             dragConstraints={{ top: 0, bottom: contentHeight - 80 }}
-            dragElastic={0.1}
+            dragElastic={0.2}
+            dragMomentum={false}
             onDragEnd={handleDragEnd}
             animate={controls}
             style={{ y: dragY }}
@@ -1141,13 +1376,12 @@ function DraggableBottomSheet({
                 }}
             >
                 <div className="max-w-xl mx-auto flex flex-col items-center">
-                    {/* Pull Handle Area - Always visible & Draggable trigger */}
-                    <div className={`w-full flex justify-center -mb-6 relative z-10 pt-4 cursor-grab active:cursor-grabbing pb-2 ${isDragDisabled ? 'opacity-0 pointer-events-none' : ''}`}>
-                        {/* Simple Handle Bar */}
-                        <div className="w-12 h-1.5 bg-white/20 rounded-full" />
+                    {/* Pull Handle Area - Enhanced target for easier dragging */}
+                    <div className="w-full flex justify-center relative z-20 pt-6 cursor-grab active:cursor-grabbing pb-4 touch-none">
+                        <div className="w-12 h-1.5 bg-white/30 rounded-full shadow-lg" />
                     </div>
 
-                    <div className="w-full pt-8">
+                    <div className="w-full -mt-2">
                         {isAddingMole ? (
                             <AddMolePanel
                                 key="add"
@@ -1170,9 +1404,18 @@ function DraggableBottomSheet({
                                 setEditingMoleId={setEditingMoleId}
                                 editLabel={editLabel}
                                 setEditLabel={setEditLabel}
+                                onExpandImage={onExpandImage}
                             />
                         ) : (
-                            <MoleListPanel key="list" moles={moles} />
+                            <MoleListPanel
+                                key="list"
+                                moles={moles}
+                                sortMode={sortMode}
+                                sortDirection={sortDirection}
+                                setSortMode={setSortMode}
+                                setSortDirection={setSortDirection}
+                                onExpandImage={onExpandImage}
+                            />
                         )}
                     </div>
                 </div>
@@ -1181,12 +1424,27 @@ function DraggableBottomSheet({
     );
 }
 
-function MoleListPanel({ moles }: { moles: any[] | undefined }) {
+function MoleListPanel({
+    moles,
+    sortMode,
+    sortDirection,
+    setSortMode,
+    setSortDirection,
+    onExpandImage
+}: {
+    moles: any[] | undefined,
+    sortMode: 'updated' | 'label',
+    sortDirection: 'asc' | 'desc',
+    setSortMode: (m: 'updated' | 'label') => void,
+    setSortDirection: (d: 'asc' | 'desc') => void,
+    onExpandImage: (url: string, moleId: number) => void
+}) {
     const setSelectedMoleId = useAppStore((s: AppState) => s.setSelectedMoleId);
+    const [showSortMenu, setShowSortMenu] = useState(false);
 
     return (
         <div
-            className="glass rounded-3xl p-6 max-h-[50vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/80 pointer-events-auto w-full animate-slide-up"
+            className="glass rounded-3xl p-6 max-h-[50vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/80 pointer-events-auto w-full"
         >
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -1196,16 +1454,80 @@ function MoleListPanel({ moles }: { moles: any[] | undefined }) {
                     </span>
                 </div>
 
-                <button
-                    onClick={() => {
-                        useAppStore.getState().setIsAddingMole(true);
-                        useAppStore.getState().setSelectedMoleId(null);
-                    }}
-                    className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-rose-500/20"
-                >
-                    <Plus className="w-4 h-4" />
-                    New Mole
-                </button>
+                <div className="flex items-center gap-2">
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSortMenu(!showSortMenu)}
+                            className={`p-2 rounded-xl border transition-all flex items-center gap-2 ${showSortMenu ? 'glass bg-rose-500/20 border-rose-500/50 text-rose-500' : 'glass bg-white/5 border-white/5 text-slate-400 hover:text-white'}`}
+                            title="Sort moles"
+                        >
+                            <ArrowUpDown className="w-4 h-4" />
+                            <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Sort</span>
+                        </button>
+
+                        {showSortMenu && (
+                            <>
+                                <div className="fixed inset-0 z-[100]" onClick={() => setShowSortMenu(false)} />
+                                <div className="absolute right-0 top-full mt-2 w-56 glass bg-slate-900/95 border border-white/10 rounded-2xl p-2 shadow-2xl z-[101] animate-fade-in">
+                                    <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5 mb-1">
+                                        Sort By
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (sortMode === 'updated') {
+                                                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                                            } else {
+                                                setSortMode('updated');
+                                                setSortDirection('desc');
+                                            }
+                                            setShowSortMenu(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-colors ${sortMode === 'updated' ? 'bg-rose-500/20 text-rose-400' : 'text-slate-300 hover:bg-white/5'}`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-4 h-4" />
+                                            <span className="whitespace-nowrap">Recently Updated</span>
+                                        </div>
+                                        {sortMode === 'updated' && (
+                                            sortDirection === 'asc' ? <SortAsc className="w-3.5 h-3.5" /> : <SortDesc className="w-3.5 h-3.5" />
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (sortMode === 'label') {
+                                                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                                            } else {
+                                                setSortMode('label');
+                                                setSortDirection('asc');
+                                            }
+                                            setShowSortMenu(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-colors ${sortMode === 'label' ? 'bg-rose-500/20 text-rose-400' : 'text-slate-300 hover:bg-white/5'}`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Edit3 className="w-4 h-4" />
+                                            <span className="whitespace-nowrap">Alphabetical</span>
+                                        </div>
+                                        {sortMode === 'label' && (
+                                            sortDirection === 'asc' ? <SortAsc className="w-3.5 h-3.5" /> : <SortDesc className="w-3.5 h-3.5" />
+                                        )}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={() => {
+                            useAppStore.getState().setIsAddingMole(true);
+                            useAppStore.getState().setSelectedMoleId(null);
+                        }}
+                        className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-rose-500/20"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Mole
+                    </button>
+                </div>
             </div>
 
             {moles?.length === 0 ? (
@@ -1225,7 +1547,7 @@ function MoleListPanel({ moles }: { moles: any[] | undefined }) {
                             className="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/5 transition-all group"
                         >
                             <div className="flex items-center gap-4">
-                                <MoleThumbnail moleId={mole.id!} />
+                                <MoleThumbnail moleId={mole.id!} onExpandImage={onExpandImage} />
                                 <div className="text-left">
                                     <p className="font-semibold text-white">{mole.label}</p>
                                     <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
@@ -1243,7 +1565,7 @@ function MoleListPanel({ moles }: { moles: any[] | undefined }) {
     );
 }
 
-function MoleThumbnail({ moleId }: { moleId: number }) {
+function MoleThumbnail({ moleId, onExpandImage }: { moleId: number, onExpandImage: (url: string, moleId: number) => void }) {
     const latestEntry = useLiveQuery(
         () => db.entries.where('moleId').equals(moleId).reverse().first(),
         [moleId]
@@ -1251,7 +1573,10 @@ function MoleThumbnail({ moleId }: { moleId: number }) {
 
     if (latestEntry?.photo) {
         return (
-            <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 shadow-inner">
+            <div
+                className="w-10 h-10 rounded-full overflow-hidden border border-white/10 shadow-inner cursor-pointer active:scale-95 transition-transform"
+                onClick={(e) => { e.stopPropagation(); onExpandImage(latestEntry.photo!, moleId); }}
+            >
                 <img src={latestEntry.photo} alt="Thumbnail" className="w-full h-full object-cover" />
             </div>
         );
@@ -1271,7 +1596,7 @@ function AddMolePanel({ onSave, label, setLabel }: { onSave: () => void, label: 
 
     return (
         <div
-            className="glass rounded-3xl p-6 border-t border-rose-500/20 shadow-2xl bg-slate-900/90 pointer-events-auto w-full animate-slide-up"
+            className="glass rounded-3xl p-6 border-t border-rose-500/20 shadow-2xl bg-slate-900/90 pointer-events-auto w-full"
         >
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -1358,7 +1683,8 @@ function MoleDetailPanel({
     editingMoleId,
     setEditingMoleId,
     editLabel,
-    setEditLabel
+    setEditLabel,
+    onExpandImage
 }: {
     onAddEntry: () => void,
     onDeleteMole: (id: number) => void,
@@ -1368,7 +1694,8 @@ function MoleDetailPanel({
     editingMoleId: number | null,
     setEditingMoleId: (id: number | null) => void,
     editLabel: string,
-    setEditLabel: (s: string) => void
+    setEditLabel: (s: string) => void,
+    onExpandImage: (url: string, moleId: number) => void
 }) {
     const selectedMoleId = useAppStore((s: AppState) => s.selectedMoleId);
     const setSelectedMoleId = useAppStore((s: AppState) => s.setSelectedMoleId);
@@ -1387,7 +1714,7 @@ function MoleDetailPanel({
 
     return (
         <div
-            className="glass rounded-3xl p-6 max-h-[70vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/90 pointer-events-auto w-full animate-slide-up"
+            className="glass rounded-3xl p-6 max-h-[70vh] flex flex-col border-t border-white/10 shadow-2xl bg-slate-900/90 pointer-events-auto w-full"
         >
             <div className="flex items-center justify-between mb-6">
                 <div className="flex-1">
@@ -1482,17 +1809,33 @@ function MoleDetailPanel({
                                     </button>
                                 </div>
                                 {entry.photo && (
-                                    <img
-                                        src={entry.photo}
-                                        alt="Mole photo"
-                                        className="w-full aspect-video object-cover"
-                                    />
+                                    <div
+                                        className="w-full aspect-video overflow-hidden cursor-pointer active:opacity-90 transition-opacity"
+                                        onClick={() => onExpandImage(entry.photo!, activeMole.id!)}
+                                    >
+                                        <img
+                                            src={entry.photo}
+                                            alt="Mole photo"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
                                 )}
                                 <div className="p-4 space-y-2">
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3 text-slate-500" />
                                             <span className="text-xs text-slate-400 font-inter">{new Date(entry.date).toLocaleDateString()}</span>
+
+                                            {/* ABCDE Badges in History List */}
+                                            {entry.abcde && entry.abcde.length > 0 && (
+                                                <div className="flex gap-1 ml-2">
+                                                    {entry.abcde.map((letter: string) => (
+                                                        <div key={letter} className="w-4 h-4 rounded bg-rose-500/20 text-rose-400 flex items-center justify-center text-[8px] font-black border border-rose-500/20">
+                                                            {letter}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         {entry.size > 0 && (
                                             <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 text-[10px] font-bold border border-rose-500/20 font-inter">
@@ -1515,6 +1858,200 @@ function MoleDetailPanel({
                     )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+function ImageOverlay({
+    selectedImageUrl,
+    expandedMoleId,
+    comparisonImageUrl,
+    setComparisonImageUrl,
+    onClose
+}: {
+    selectedImageUrl: string,
+    expandedMoleId: number | null,
+    comparisonImageUrl: string | null,
+    setComparisonImageUrl: (url: string | null) => void,
+    onClose: () => void
+}) {
+    const [showComparisonSelector, setShowComparisonSelector] = useState(false);
+    const [showABCDEGuide, setShowABCDEGuide] = useState(false);
+
+    const expandedMoleEntries = useLiveQuery(
+        () => expandedMoleId ? db.entries.where('moleId').equals(expandedMoleId).toArray() : [],
+        [expandedMoleId]
+    ) || [];
+    const otherEntries = expandedMoleEntries.filter(e => e.photo && e.photo !== selectedImageUrl);
+
+    return (
+        <div
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-2xl z-[100] flex flex-col items-center justify-center p-4 animate-fade-in pointer-events-auto"
+            onClick={onClose}
+        >
+            {/* Header Controls */}
+            <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-10">
+                <div className="flex items-center gap-2">
+                    {otherEntries.length > 0 && (
+                        <button
+                            className={`glass px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2 ${showComparisonSelector ? 'bg-rose-500/20 border-rose-500/30 text-rose-500' : 'text-white hover:bg-white/5 border border-white/10'}`}
+                            onClick={(e) => { e.stopPropagation(); setShowComparisonSelector(!showComparisonSelector); setShowABCDEGuide(false); }}
+                        >
+                            <ArrowLeftRight className="w-3.5 h-3.5" />
+                            {comparisonImageUrl ? 'Change' : 'Compare'}
+                        </button>
+                    )}
+                    {comparisonImageUrl && (
+                        <button
+                            className="glass px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-widest transition-all text-slate-300 hover:text-white hover:bg-white/5 border border-white/10"
+                            onClick={(e) => { e.stopPropagation(); setComparisonImageUrl(null); }}
+                        >
+                            Exit
+                        </button>
+                    )}
+                    <button
+                        className={`glass px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2 ${showABCDEGuide ? 'bg-blue-500/20 border-blue-500/30 text-blue-400' : 'text-white hover:bg-white/5 border border-white/10'}`}
+                        onClick={(e) => { e.stopPropagation(); setShowABCDEGuide(!showABCDEGuide); setShowComparisonSelector(false); }}
+                    >
+                        <Info className="w-3.5 h-3.5" />
+                        Guide
+                    </button>
+                </div>
+
+                <button
+                    className="glass w-11 h-11 rounded-full flex items-center justify-center text-white hover:bg-rose-500/20 hover:text-rose-500 transition-all border border-white/10 shadow-xl"
+                    onClick={(e) => { e.stopPropagation(); onClose(); }}
+                >
+                    <X className="w-6 h-6" />
+                </button>
+            </div>
+
+            {/* Image(s) Container */}
+            <div className={`w-full h-full flex flex-col md:flex-row items-center justify-center gap-6 pt-24 transition-all duration-500`}>
+                <div className={`relative flex items-center justify-center transition-all duration-500 ${comparisonImageUrl ? 'w-full md:w-1/2 h-1/2 md:h-[80vh]' : 'w-full h-[85vh]'}`}>
+                    <motion.img
+                        layout
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        src={selectedImageUrl}
+                        alt="Expanded mole"
+                        className="max-w-full max-h-full object-contain rounded-3xl shadow-2xl border border-white/5"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+
+                    {/* Primary Labels Overlay */}
+                    {comparisonImageUrl && (
+                        <div className="absolute top-6 left-6 glass px-4 py-1.5 rounded-full border border-white/10 text-[10px] font-bold text-white uppercase tracking-widest">
+                            Primary
+                        </div>
+                    )}
+                </div>
+
+                {comparisonImageUrl && (
+                    <div className="w-full md:w-1/2 h-1/2 md:h-[80vh] relative flex items-center justify-center animate-scale-in">
+                        <motion.img
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            src={comparisonImageUrl}
+                            alt="Comparison mole"
+                            className="max-w-full max-h-full object-contain rounded-3xl shadow-2xl border border-white/5"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="absolute top-6 right-6">
+                            <div className="bg-rose-500/90 glass backdrop-blur-3xl px-4 py-1.5 rounded-full border border-rose-500/30 text-[10px] font-bold text-white uppercase tracking-widest shadow-lg">
+                                Comparison
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ABCDE Guide Overlay */}
+            {showABCDEGuide && (
+                <div
+                    className="absolute inset-0 z-30 flex items-center justify-center p-6 animate-fade-in"
+                    onClick={() => setShowABCDEGuide(false)}
+                >
+                    <div
+                        className="glass bg-slate-900/90 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl backdrop-blur-3xl space-y-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xl font-bold text-white flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                    <Info className="w-5 h-5 text-blue-400" />
+                                </div>
+                                ABCDE Guide
+                            </h4>
+                            <button onClick={() => setShowABCDEGuide(false)} className="text-slate-400 hover:text-white p-2">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 font-inter text-left">
+                            {ABCDE_ITEMS.map((item) => (
+                                <div key={item.letter} className="flex gap-4 p-3 rounded-2xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 flex flex-shrink-0 items-center justify-center text-xl font-black text-rose-500 shadow-inner">
+                                        {item.letter}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-white text-sm">{item.title}</p>
+                                        <p className="text-slate-400 text-xs leading-relaxed">{item.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="pt-4 border-t border-white/5 font-inter">
+                            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex gap-3 text-rose-200">
+                                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                <p className="text-[10px] uppercase font-bold tracking-wider leading-relaxed">
+                                    Self-checks are for tracking only. Consult a doctor for any new or changing spots.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Comparison Selector */}
+            {showComparisonSelector && (
+                <div
+                    className="absolute bottom-12 left-4 right-4 md:left-12 md:right-12 animate-slide-up z-20"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="glass bg-slate-900/80 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl backdrop-blur-3xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-white font-bold text-xs uppercase tracking-widest opacity-60">Compare with check-up from:</h4>
+                            <button onClick={() => setShowComparisonSelector(false)} className="text-slate-400 hover:text-white">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
+                            {otherEntries.map((entry) => (
+                                <button
+                                    key={entry.id}
+                                    onClick={() => {
+                                        setComparisonImageUrl(entry.photo!);
+                                        setShowComparisonSelector(false);
+                                    }}
+                                    className="flex-shrink-0 group"
+                                >
+                                    <div className="w-24 h-24 rounded-xl overflow-hidden border border-white/10 group-hover:border-rose-500/50 transition-all relative">
+                                        <img src={entry.photo!} alt="Entry thumbnail" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <Plus className="w-6 h-6 text-white" />
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-tighter">
+                                        {new Date(entry.date).toLocaleDateString()}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

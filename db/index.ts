@@ -20,6 +20,7 @@ export interface MoleEntry {
     // AR metadata placeholders
     referenceObject?: string; // e.g., 'coin', 'ruler'
     scaleReference?: number; // scale factor
+    abcde?: string[]; // Array of checked letters ['A', 'C', etc.]
 }
 
 export class AppDatabase extends Dexie {

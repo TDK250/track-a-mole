@@ -33,6 +33,12 @@ export interface AppState {
     menuHeight: number;
     setMenuHeight: (height: number) => void;
 
+    // Sorting State
+    sortMode: 'updated' | 'label';
+    sortDirection: 'asc' | 'desc';
+    setSortMode: (mode: 'updated' | 'label') => void;
+    setSortDirection: (direction: 'asc' | 'desc') => void;
+
     // Tutorial State
     tutorialStep: number; // 0=none, 1=welcome, 2=camera, 3=add, 4=menu
     setTutorialStep: (step: number) => void;
@@ -47,6 +53,8 @@ export const useAppStore = create<AppState>((set) => {
     const savedGender = isClient ? localStorage.getItem('gender-value') as 'male' | 'female' | null : null;
     const savedSmartReminders = isClient ? localStorage.getItem('smart-reminders-enabled') !== 'false' : true; // Default true
     const hasCompletedTutorial = isClient ? localStorage.getItem('tutorial-completed') === 'true' : false;
+    const savedSortMode = isClient ? localStorage.getItem('sort-mode') as 'updated' | 'label' | null : null;
+    const savedSortDirection = isClient ? localStorage.getItem('sort-direction') as 'asc' | 'desc' | null : null;
 
     return {
         gender: savedGender || 'male',
@@ -55,9 +63,9 @@ export const useAppStore = create<AppState>((set) => {
             if (isClient) localStorage.setItem('gender-value', gender);
         },
         selectedMoleId: null,
-        setSelectedMoleId: (id) => set({ selectedMoleId: id }),
+        setSelectedMoleId: (id) => set((s) => ({ selectedMoleId: id, isMenuOpen: id ? true : s.isMenuOpen })),
         isAddingMole: false,
-        setIsAddingMole: (isAdding) => set({ isAddingMole: isAdding }),
+        setIsAddingMole: (isAdding) => set((s) => ({ isAddingMole: isAdding, isMenuOpen: isAdding ? true : s.isMenuOpen })),
         tempMolePosition: null,
         setTempMolePosition: (pos) => set({ tempMolePosition: pos }),
         tempMoleNormal: null,
@@ -89,12 +97,24 @@ export const useAppStore = create<AppState>((set) => {
 
         // Tutorial
         tutorialStep: 0, // Default to 0, logic in UIOverlay will trigger step 1 if needed
-        setTutorialStep: (step) => set({ tutorialStep: step }),
+        setTutorialStep: (step: number) => set({ tutorialStep: step }),
         completeTutorial: () => {
             set({ tutorialStep: 0 });
             if (isClient) localStorage.setItem('tutorial-completed', 'true');
         },
         hasInteractedWithModel: false,
-        setHasInteractedWithModel: (has) => set({ hasInteractedWithModel: has })
+        setHasInteractedWithModel: (has: boolean) => set({ hasInteractedWithModel: has }),
+
+        // Sorting
+        sortMode: savedSortMode || 'updated',
+        sortDirection: savedSortDirection || 'desc',
+        setSortMode: (mode) => {
+            set({ sortMode: mode });
+            if (isClient) localStorage.setItem('sort-mode', mode);
+        },
+        setSortDirection: (direction) => {
+            set({ sortDirection: direction });
+            if (isClient) localStorage.setItem('sort-direction', direction);
+        }
     };
 });

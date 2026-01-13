@@ -1,0 +1,4 @@
+origin	https://github.com/TDK250/track-a-mole (fetch)
+origin	https://github.com/TDK250/track-a-mole (push)
+trackamole	https://github.com/TDK250/track-a-mole.git (fetch)
+trackamole	https://github.com/TDK250/track-a-mole.git (push)

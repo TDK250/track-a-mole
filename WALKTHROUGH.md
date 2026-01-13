@@ -1,35 +1,51 @@
-# Track-A-Mole Rebranding and Deployment Walkthrough
+# Features Added: Mole Sorting & Comparison
 
-This document summarizes the changes made to rename the "holymoley" app to "Track-A-Mole," fix deployment issues, and establish store metadata.
+I've implemented two major enhancements to help you track changes in your moles more effectively, all with a polished, consistent "blur" aesthetic.
 
-## ✅ Key Accomplishments
+## 1. Mole Sorting
+You can now sort your moles in the "Your Moles" list to quickly find what you're looking for.
+- **Recently Updated**: Sort by the date of the last check-up entry.
+- **Alphabetical**: Sort by the name/label of the mole.
+- **Directional**: Toggle between ascending and descending for both modes.
+- **Persistent**: Your sorting preferences are saved and remembered.
 
-### 1. App-Wide Rebranding
-- **Next.js & Browser**: Updated `package.json`, `next.config.js`, and `app/layout.tsx`.
-- **Android**: Updated namespace, Application ID, and string resources (`strings.xml`). Moved `MainActivity.java` to the correct package directory (`com.tomkerr.trackamole`).
-- **iOS**: Updated `CFBundleDisplayName` and `PRODUCT_BUNDLE_IDENTIFIER`.
+## 2. Image Inspection & Comparison
+Tapping on any mole photo (from the list or history) opens a premium inspection mode.
+- **Side-by-Side View**: Tap the "Compare" button while inspecting an image to select another entry and view them side-by-side. This makes it incredibly easy to spot changes over time.
+- **Integrated ABCDE Diagnostic**: The ABCDE checklist is now a core part of the mole entry form, presented as a compact list of descriptive toggles (e.g., "Asymmetry", "Border") for quick and accurate logging.
+- **History Timeline Indicators**: Selected ABCDE criteria appear as small badges next to the date in the history list, allowing for a quick scan of symptom progression over time.
+- **Standardized "Blur" Aesthetic**: The entire interface has been unified using a consistent glassmorphism style with deep background blurs, avoiding the "liquid glass" look.
+- **Clean Header Controls**: Controls are consolidated in the top bar for easy access and a clutter-free view.
 
-### 2. Store Preparation
-- **Metadata**: Created full descriptions and titles for Google Play (Fastlane structure).
-- **iOS App Store**: Established name, description, keywords, and support URLs.
-- **F-Droid**: Created `fdroid.yml` with correct build categories and GitHub URLs.
-- **Icons**: Replaced assets with a new professional, minimalist mole tracking icon.
+## 3. Unified Collapsible Navigation
+The app's menu system now feels more native and responsive than ever.
+- **Collapsible Detail & Add Panels**: Individual mole menus and the new mole setup panel are now draggable/collapsible just like the main menu.
+- **Context-Aware Opening**: Selecting a mole or starting a new setup automatically pops the menu open if it was collapsed, ensuring you're always in the right context.
+- **Always-Visible Drag Handle**: A standardized drag handle provides a clear visual cue for how to interact with the bottom sheet, regardless of the view.
 
-### 4. UI/UX Refinements & Security
-- **Secure Export**: Implemented password-protected `.tam` backups using AES-GCM encryption.
-- **Privacy Overview**: Integrated a dedicated "Security & Privacy" modal in the app UI, clarifying the local-first, zero-cloud data policy.
-- **Advanced Reminders**: Refined the monthly reminder system to support "Nth Day of the Week" (e.g., 1st Wednesday), moving away from unreliable date-based triggers.
-- **Aesthetic Improvements**: Adjusted the 3D model height for better visibility and smoother UI transitions with `framer-motion`'s `mode="wait"`.
+## Changes Made
 
-## 🛠 Verification Summary
+### UI Components
+- **[UIOverlay.tsx](file:///home/tomkerr/Documents/Projects/Code/Projects/trackamole/components/UIOverlay.tsx)**: 
+    - Implemented `ImageOverlay` with comparison logic.
+    - Added sorting UI and logic to `MoleListPanel`.
+    - Standardized all new and existing glass components to use high-quality blurs.
+    - Fixed layout overlaps in the header.
 
-### Automated Checks
-- Verified that no "holymoley" strings remain in the search scope (excluding build artifacts).
-- Confirmed that GitHub URLs are correctly synchronized with the `TDK250/track-a-mole` repository.
+### State Management
+- **[appStore.ts](file:///home/tomkerr/Documents/Projects/Code/Projects/trackamole/store/appStore.ts)**:
+    - Added `sortMode` and `sortDirection` to the global state with persistence.
 
-### Manual Review
-- Checked `.gitignore` to ensure temporary agent files are excluded.
-- Verified that `README.md` provides accurate setup and mobile development instructions.
+## Verification Results
 
-## 🚀 Final Repo Status
-All changes are pushed and live on GitHub. The action runner should now correctly deploy the site to GitHub Pages.
+### Sorting
+- [x] Alphabetical sorting (A-Z, Z-A) works correctly.
+- [x] Recently Updated sorting (Newest/Oldest) correctly pulls from the latest entry date.
+- [x] Settings persist after refresh.
+
+### Image Comparison
+- [x] Images expand on tap.
+- [x] "Compare" button opens a selector with only relevant entries (same mole, has photo).
+- [x] Side-by-side view displays both images clearly.
+- [x] "Exit Comparison" returns to single view.
+- [x] Visual style is consistent across all components.

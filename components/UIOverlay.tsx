@@ -227,6 +227,7 @@ export default function UIOverlay() {
         await db.moles.clear();
         await db.entries.clear();
         localStorage.removeItem('gender-selected');
+        localStorage.removeItem('app-lock-pin');
         setShowResetConfirm(false);
         setShowSettings(false);
         setShowOnboarding(true);
@@ -590,23 +591,23 @@ export default function UIOverlay() {
             {/* Settings Panel */}
             {showSettings && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto z-40 flex items-center justify-center p-4 fade-in"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto z-40 flex items-end sm:items-center justify-center p-4 fade-in"
                     onClick={() => !showResetConfirm && setShowSettings(false)}
                 >
                     <div
-                        className="glass rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-700/50 bg-slate-900/90 animate-fade-in"
+                        className="glass rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-700/50 bg-slate-900/90 flex flex-col max-h-[90vh] animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {!showResetConfirm ? (
-                            <>
-                                <div className="flex items-center justify-between mb-6">
+                            <div className="flex flex-col h-full overflow-hidden">
+                                <div className="flex items-center justify-between mb-6 shrink-0">
                                     <h2 className="text-xl font-bold text-white">Settings</h2>
                                     <button onClick={() => setShowSettings(false)} className="p-2 -mr-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors">
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-4 overflow-y-auto pr-2 -mr-2 pb-2">
                                     {/* Reminders Section */}
                                     <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
                                         <div className="flex items-center justify-between">
@@ -723,7 +724,7 @@ export default function UIOverlay() {
                                         Reset All Data
                                     </button>
                                 </div>
-                            </>
+                            </div>
                         ) : (
                             <>
                                 <div className="text-center mb-6">
@@ -758,21 +759,25 @@ export default function UIOverlay() {
 
             {/* Security Explanation Modal */}
             {showSecurity && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[70] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[70] flex items-end sm:items-center justify-center p-4">
                     <div
-                        className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl max-h-[85vh] overflow-y-auto animate-fade-in"
+                        className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-slide-up"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between mb-6 sticky top-0 bg-slate-900 pb-2">
+                        <div className="flex items-center justify-between mb-6 shrink-0">
                             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                 <ShieldCheck className="w-6 h-6 text-emerald-400" />
                                 Privacy Policy
                             </h2>
-                            <button onClick={() => setShowSecurity(false)} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors">
+                            <button
+                                onClick={() => setShowSecurity(false)}
+                                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                            >
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="space-y-6 text-slate-300">
+                        <div className="flex-1 overflow-y-auto space-y-6 text-slate-300 pr-2 -mr-2">
                             <section>
                                 <h3 className="text-white font-bold mb-2 flex items-center gap-2">
                                     <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[10px] text-emerald-400">1</div>
@@ -829,8 +834,8 @@ export default function UIOverlay() {
 
             {/* Export Password Modal */}
             {showExportWindow && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto z-[70] flex items-center justify-center p-4">
-                    <div className="glass border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-fade-in">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto z-[70] flex items-end sm:items-center justify-center p-4">
+                    <div className="glass border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-slide-up">
                         <h2 className="text-xl font-bold text-white mb-2">Secure Export</h2>
                         <p className="text-slate-400 text-sm mb-6">
                             Create an encrypted backup. If you set a password, you will need it to restore your data.
@@ -875,8 +880,8 @@ export default function UIOverlay() {
 
             {/* Import Password Modal */}
             {showImportWindow && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto z-[70] flex items-center justify-center p-4">
-                    <div className="glass border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-fade-in">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto z-[70] flex items-end sm:items-center justify-center p-4">
+                    <div className="glass border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-slide-up">
                         <h2 className="text-xl font-bold text-white mb-2">Restoring Data</h2>
                         <p className="text-slate-400 text-sm mb-6">
                             This encrypted backup requires a password to decrypt.
@@ -913,30 +918,35 @@ export default function UIOverlay() {
             {/* ABCDE Guide Modal */}
             {showABCDEModal && (
                 <div
-                    className="fixed inset-0 z-[120] flex items-center justify-center p-6 animate-fade-in pointer-events-auto bg-black/60 backdrop-blur-sm"
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto z-[120] flex items-end sm:items-center justify-center p-4"
                     onClick={() => {
                         setShowABCDEModal(false);
                         setAbcdeChecked(new Set());
                     }}
-
                 >
                     <div
-                        className="glass bg-slate-900/90 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl backdrop-blur-3xl space-y-6"
+                        className="glass bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-md w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-6">
                             <h4 className="text-xl font-bold text-white flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
                                     <Info className="w-5 h-5 text-blue-400" />
                                 </div>
                                 ABCDE Guide
                             </h4>
-                            <button onClick={() => { setShowABCDEModal(false); setAbcdeChecked(new Set()); }} className="text-slate-400 hover:text-white p-2">
+                            <button
+                                onClick={() => {
+                                    setShowABCDEModal(false);
+                                    setAbcdeChecked(new Set());
+                                }}
+                                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                            >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="space-y-3 font-inter text-left">
+                        <div className="flex-1 overflow-y-auto space-y-3 font-inter text-left pr-2 -mr-2">
                             {ABCDE_ITEMS.map((item) => {
                                 const isChecked = abcdeChecked.has(item.letter);
                                 return (
@@ -969,14 +979,14 @@ export default function UIOverlay() {
                                     </button>
                                 );
                             })}
-                        </div>
 
-                        <div className="pt-4 border-t border-white/5 font-inter text-left">
-                            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex gap-3 text-rose-200">
-                                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                                <p className="text-[10px] uppercase font-bold tracking-wider leading-relaxed">
-                                    Self-checks are for tracking only. Consult a doctor for any new or changing spots.
-                                </p>
+                            <div className="pt-4 border-t border-white/5 font-inter text-left">
+                                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex gap-3 text-rose-200">
+                                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                    <p className="text-[10px] uppercase font-bold tracking-wider leading-relaxed">
+                                        Self-checks are for tracking only. Consult a doctor for any new or changing spots.
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -985,7 +995,7 @@ export default function UIOverlay() {
                                 setShowABCDEModal(false);
                                 setAbcdeChecked(new Set());
                             }}
-                            className="w-full py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all border border-white/10 text-sm uppercase tracking-widest"
+                            className="w-full py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all shadow-lg shadow-rose-500/20 mt-6 active:scale-[0.98] text-sm uppercase tracking-widest"
                         >
                             Got it
                         </button>
@@ -1065,8 +1075,8 @@ export default function UIOverlay() {
             {/* PIN Setup Modal */}
             {
                 showPinSetup && (
-                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md pointer-events-auto z-[80] flex items-center justify-center p-4">
-                        <div className="w-full max-w-xs flex flex-col items-center animate-fade-in">
+                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md pointer-events-auto z-[80] flex items-end sm:items-center justify-center p-4">
+                        <div className="w-full max-w-xs flex flex-col items-center animate-slide-up">
                             <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-6 text-white">
                                 <Lock className="w-8 h-8" />
                             </div>
@@ -1969,28 +1979,31 @@ function ImageOverlay({
             {/* ABCDE Guide Overlay */}
             {showABCDEGuide && (
                 <div
-                    className="absolute inset-0 z-30 flex items-center justify-center p-6 animate-fade-in"
+                    className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-fade-in pointer-events-auto"
                     onClick={() => setShowABCDEGuide(false)}
                 >
                     <div
-                        className="glass bg-slate-900/90 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl backdrop-blur-3xl space-y-6"
+                        className="glass bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-md w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-6">
                             <h4 className="text-xl font-bold text-white flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
                                     <Info className="w-5 h-5 text-blue-400" />
                                 </div>
                                 ABCDE Guide
                             </h4>
-                            <button onClick={() => setShowABCDEGuide(false)} className="text-slate-400 hover:text-white p-2">
+                            <button
+                                onClick={() => setShowABCDEGuide(false)}
+                                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                            >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="space-y-4 font-inter text-left">
+                        <div className="flex-1 overflow-y-auto space-y-4 font-inter text-left pr-2 -mr-2">
                             {ABCDE_ITEMS.map((item) => (
-                                <div key={item.letter} className="flex gap-4 p-3 rounded-2xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                                <div key={item.letter} className="flex gap-4 p-3 rounded-2xl bg-white/5 border border-transparent">
                                     <div className="w-10 h-10 rounded-xl bg-white/5 flex flex-shrink-0 items-center justify-center text-xl font-black text-rose-500 shadow-inner">
                                         {item.letter}
                                     </div>
@@ -2000,16 +2013,23 @@ function ImageOverlay({
                                     </div>
                                 </div>
                             ))}
-                        </div>
 
-                        <div className="pt-4 border-t border-white/5 font-inter">
-                            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex gap-3 text-rose-200">
-                                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                                <p className="text-[10px] uppercase font-bold tracking-wider leading-relaxed">
-                                    Self-checks are for tracking only. Consult a doctor for any new or changing spots.
-                                </p>
+                            <div className="pt-4 border-t border-white/5 font-inter">
+                                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex gap-3 text-rose-200">
+                                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                    <p className="text-[10px] uppercase font-bold tracking-wider leading-relaxed">
+                                        Self-checks are for tracking only. Consult a doctor for any new or changing spots.
+                                    </p>
+                                </div>
                             </div>
                         </div>
+
+                        <button
+                            onClick={() => setShowABCDEGuide(false)}
+                            className="w-full py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all shadow-lg shadow-rose-500/20 mt-6 active:scale-[0.98] text-sm uppercase tracking-widest"
+                        >
+                            Got it
+                        </button>
                     </div>
                 </div>
             )}

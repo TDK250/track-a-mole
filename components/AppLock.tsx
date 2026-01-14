@@ -13,10 +13,13 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Check if PIN is set in localStorage
         const storedPin = localStorage.getItem('app-lock-pin');
-        if (storedPin) {
+        // Robust check: must be a string of exactly 4 digits
+        if (storedPin && /^\d{4}$/.test(storedPin)) {
             setHasPin(true);
             setIsLocked(true);
         } else {
+            // Clear invalid values if any
+            if (storedPin) localStorage.removeItem('app-lock-pin');
             setHasPin(false);
             setIsLocked(false);
         }

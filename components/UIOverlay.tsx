@@ -1387,11 +1387,11 @@ function DraggableBottomSheet({
             >
                 <div className="max-w-xl mx-auto flex flex-col items-center px-4">
                     {/* Pull Handle Area - Enhanced target for easier dragging */}
-                    <div className="w-full flex justify-center relative z-20 pt-6 cursor-grab active:cursor-grabbing pb-4 touch-none">
+                    <div className="w-full flex justify-center relative z-20 pt-10 cursor-grab active:cursor-grabbing pb-4 touch-none">
                         <div className="w-12 h-1.5 bg-white/30 rounded-full shadow-lg" />
                     </div>
 
-                    <div className="w-full -mt-2">
+                    <div className="w-full">
                         {isAddingMole ? (
                             <AddMolePanel
                                 key="add"
@@ -1900,7 +1900,10 @@ function ImageOverlay({
             onClick={onClose}
         >
             {/* Header Controls */}
-            <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-10">
+            <div
+                className="absolute left-6 right-6 flex justify-between items-center z-10"
+                style={{ top: 'calc(env(safe-area-inset-top) + 2rem)' }}
+            >
                 <div className="flex items-center gap-2">
                     {otherEntries.length > 0 && (
                         <button

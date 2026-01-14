@@ -1460,6 +1460,7 @@ function MoleListPanel({
     onExpandImage: (url: string, moleId: number) => void
 }) {
     const setSelectedMoleId = useAppStore((s: AppState) => s.setSelectedMoleId);
+    const tutorialStep = useAppStore((s: AppState) => s.tutorialStep);
     const [showSortMenu, setShowSortMenu] = useState(false);
 
     return (

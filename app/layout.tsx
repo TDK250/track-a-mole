@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import PWARegistration from "@/components/PWARegistration";
 import AppLock from "@/components/AppLock";
+import DisclaimerScreen from "@/components/DisclaimerScreen";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -34,9 +35,11 @@ export default function RootLayout({
         <html lang="en" className="dark" suppressHydrationWarning>
             <body className={`${inter.className} bg-slate-950 text-slate-50 antialiased overflow-hidden`} suppressHydrationWarning>
                 <PWARegistration />
-                <AppLock>
-                    {children}
-                </AppLock>
+                <DisclaimerScreen>
+                    <AppLock>
+                        {children}
+                    </AppLock>
+                </DisclaimerScreen>
             </body>
         </html>
     );

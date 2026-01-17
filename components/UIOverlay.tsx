@@ -69,6 +69,9 @@ export default function UIOverlay() {
     const [showPassword, setShowPassword] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Tutorial initialization guard
+    const tutorialInitializedRef = useRef(false);
+
     // App Lock State
     const [hasPin, setHasPin] = useState(false);
     const [showPinSetup, setShowPinSetup] = useState(false);
@@ -140,23 +143,23 @@ export default function UIOverlay() {
         // Check for App Lock
         const savedPin = localStorage.getItem('app-lock-pin');
         setHasPin(!!savedPin);
-
-        // Check Tutorial (only if fully loaded and not onboarding)
-        const tutorialDone = localStorage.getItem('tutorial-completed');
-        // We defer this check slightly or ensure showOnboarding is settled
-        if (!tutorialDone && hasSelectedGender) {
-            // Only set step 1 if we are sure we are not onboarding
-            setTutorialStep(1);
-        }
     }, []); // Run once on mount
 
-    // Separate effect to handle post-onboarding tutorial start
+    // Handle tutorial start - consolidated into single effect with guard
     useEffect(() => {
         const tutorialDone = localStorage.getItem('tutorial-completed');
-        if (!showOnboarding && !tutorialDone && localStorage.getItem('gender-selected')) {
+        const hasSelectedGender = localStorage.getItem('gender-selected');
+
+        // Only start tutorial if:
+        // 1. Tutorial hasn't been completed
+        // 2. Gender has been selected (not in onboarding)
+        // 3. Onboarding is closed
+        // 4. We haven't already initialized the tutorial
+        if (!tutorialDone && hasSelectedGender && !showOnboarding && !tutorialInitializedRef.current) {
+            tutorialInitializedRef.current = true;
             setTutorialStep(1);
         }
-    }, [showOnboarding]);
+    }, [showOnboarding]); // Only re-run when showOnboarding changes
 
     // Handle Notification Scheduling
     useEffect(() => {
@@ -229,8 +232,7 @@ export default function UIOverlay() {
         localStorage.setItem('gender-selected', 'true');
         localStorage.setItem('gender-value', selectedGender);
         setShowOnboarding(false);
-        // Start tutorial after onboarding
-        setTimeout(() => setTutorialStep(1), 500);
+        // Tutorial will start automatically via useEffect when showOnboarding becomes false
     };
 
     const handleResetData = async () => {

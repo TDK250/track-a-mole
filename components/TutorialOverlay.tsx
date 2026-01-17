@@ -2,40 +2,67 @@
 
 import { useAppStore } from "@/store/appStore";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, ChevronRight, Camera, Move, MousePointerClick, ArrowUp, Hand, Pointer, AlertTriangle } from "lucide-react";
+import { X, ChevronRight, Camera, Move, MousePointerClick, ArrowUp, Hand, Pointer, FileText, MapPin } from "lucide-react";
 import { useEffect } from "react";
 
 export default function TutorialOverlay() {
-    const { tutorialStep, setTutorialStep, completeTutorial, isMenuOpen, setIsMenuOpen, hasInteractedWithModel, isAddingMole, menuHeight } = useAppStore();
+    const { tutorialStep, setTutorialStep, completeTutorial, isMenuOpen, setIsMenuOpen, hasInteractedWithModel, isAddingMole, menuHeight, selectedMoleId, tempMolePosition } = useAppStore();
 
-    // Reset interaction state when entering spin step (now step 3)
+    // Reset interaction state when entering spin step (step 2)
     useEffect(() => {
-        if (tutorialStep === 3) {
+        if (tutorialStep === 2) {
             useAppStore.getState().setHasInteractedWithModel(false);
         }
     }, [tutorialStep]);
 
-    // Step 3: Advance when model is rotated
+    // Step 2: Advance when model is rotated
     useEffect(() => {
-        if (tutorialStep === 3 && hasInteractedWithModel) {
+        if (tutorialStep === 2 && hasInteractedWithModel) {
             const timer = setTimeout(() => {
-                setTutorialStep(4);
+                setTutorialStep(3);
             }, 1000);
             return () => clearTimeout(timer);
         }
     }, [tutorialStep, hasInteractedWithModel, setTutorialStep]);
 
-    // Step 4: Complete when entering "Add Mole" mode
+    // Step 3: Advance when entering "Add Mole" mode
     useEffect(() => {
-        if (tutorialStep === 4 && isAddingMole) {
-            completeTutorial();
+        if (tutorialStep === 3 && isAddingMole) {
+            setTutorialStep(4);
         }
-    }, [tutorialStep, isAddingMole, completeTutorial]);
+    }, [tutorialStep, isAddingMole, setTutorialStep]);
+
+    // Step 4: Advance when user taps on body (tempMolePosition is set)
+    useEffect(() => {
+        if (tutorialStep === 4 && tempMolePosition !== null) {
+            setTutorialStep(5);
+        }
+    }, [tutorialStep, tempMolePosition, setTutorialStep]);
+
+    // Step 5: Advance when mole is saved (selectedMoleId is set after saving)
+    useEffect(() => {
+        if (tutorialStep === 5 && selectedMoleId !== null && !isAddingMole) {
+            const timer = setTimeout(() => {
+                setTutorialStep(6);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [tutorialStep, selectedMoleId, isAddingMole, setTutorialStep]);
+
+    // Step 6: Complete tutorial after a brief display
+    useEffect(() => {
+        if (tutorialStep === 6) {
+            const timer = setTimeout(() => {
+                completeTutorial();
+            }, 5000); // Give user 5 seconds to read the final step
+            return () => clearTimeout(timer);
+        }
+    }, [tutorialStep, completeTutorial]);
 
     if (tutorialStep === 0) return null;
 
     const nextStep = () => {
-        if (tutorialStep >= 4) {
+        if (tutorialStep >= 6) {
             completeTutorial();
         } else {
             setTutorialStep(tutorialStep + 1);
@@ -48,10 +75,12 @@ export default function TutorialOverlay() {
 
     const getPositionClass = () => {
         switch (tutorialStep) {
-            case 1: return "items-center justify-center p-4"; // Disclaimer: Center
-            case 2: return "items-center justify-end pb-32"; // Welcome: Bottom
-            case 3: return "items-center justify-end pb-24"; // Spin: Bottom
-            case 4: return "items-center justify-start pt-32"; // Spot: Top
+            case 1: return "items-center justify-end pb-32"; // Welcome: Bottom
+            case 2: return "items-center justify-end pb-24"; // Spin: Bottom
+            case 3: return "items-center justify-start pt-20"; // Add Mole Button (at bottom): Show at Top
+            case 4: return "items-center justify-start pt-20"; // Tap Body: Show at Top
+            case 5: return "items-center justify-start pt-20"; // Name Mole (form at bottom): Show at Top
+            case 6: return "items-center justify-start pt-20"; // Record Checkup (menu at bottom): Show at Top
             default: return "items-center justify-end";
         }
     };
@@ -62,15 +91,21 @@ export default function TutorialOverlay() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
                 className={`fixed inset-0 z-50 pointer-events-none flex flex-col ${getPositionClass()} transition-all duration-500`}
             >
-                {/* Backdrop for step 1 (Disclaimer) and 2 (Welcome) */}
-                {(tutorialStep === 1 || tutorialStep === 2) && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" />
+                {/* Backdrop for step 1 (Welcome) */}
+                {tutorialStep === 1 && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
+                    />
                 )}
 
-                {/* Step 3 Visual Cue: Swipe Animation */}
-                {tutorialStep === 3 && (
+                {/* Step 2 Visual Cue: Swipe Animation */}
+                {tutorialStep === 2 && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <motion.div
                             animate={{ x: [-60, 60] }}
@@ -83,7 +118,18 @@ export default function TutorialOverlay() {
                     </div>
                 )}
 
-
+                {/* Step 4 Visual Cue: Tap Animation */}
+                {tutorialStep === 4 && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <motion.div
+                            animate={{ scale: [1, 1.2, 1] }}
+                            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                            className="text-rose-400"
+                        >
+                            <MousePointerClick className="w-16 h-16 drop-shadow-lg" />
+                        </motion.div>
+                    </div>
+                )}
 
                 {/* Content Container */}
                 <div className="relative z-60 w-full max-w-sm px-6 pointer-events-none mb-4">
@@ -97,32 +143,8 @@ export default function TutorialOverlay() {
                     >
                         <div className="flex flex-col items-center text-center space-y-4">
 
-                            {/* STEP 1: Disclaimer */}
+                            {/* STEP 1: Welcome */}
                             {tutorialStep === 1 && (
-                                <>
-                                    <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mb-2">
-                                        <AlertTriangle className="w-8 h-8 text-amber-500" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-white">Medical Disclaimer</h3>
-                                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-left">
-                                        <p className="text-amber-200 text-sm leading-relaxed font-medium">
-                                            This app is for tracking purposes only and is <strong>not a diagnostic tool</strong>.
-                                        </p>
-                                        <p className="text-slate-400 text-xs mt-2 leading-relaxed">
-                                            Always consult a qualified dermatologist for any new, changing, or concerning spots on your skin.
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={nextStep}
-                                        className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition-colors mt-4"
-                                    >
-                                        I Understand
-                                    </button>
-                                </>
-                            )}
-
-                            {/* STEP 2: Welcome */}
-                            {tutorialStep === 2 && (
                                 <>
                                     <div className="w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center mb-2">
                                         <span className="text-3xl">👋</span>
@@ -140,8 +162,8 @@ export default function TutorialOverlay() {
                                 </>
                             )}
 
-                            {/* STEP 3: Spin Model */}
-                            {tutorialStep === 3 && (
+                            {/* STEP 2: Spin Model */}
+                            {tutorialStep === 2 && (
                                 <>
                                     <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-2 text-blue-400">
                                         <Move className="w-6 h-6" />
@@ -156,8 +178,8 @@ export default function TutorialOverlay() {
                                 </>
                             )}
 
-                            {/* STEP 4: Add Mole */}
-                            {tutorialStep === 4 && (
+                            {/* STEP 3: Click Add Mole Button */}
+                            {tutorialStep === 3 && (
                                 <>
                                     <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-2 text-emerald-400">
                                         <MousePointerClick className="w-6 h-6" />
@@ -169,10 +191,55 @@ export default function TutorialOverlay() {
                                 </>
                             )}
 
+                            {/* STEP 4: Tap on Body */}
+                            {tutorialStep === 4 && (
+                                <>
+                                    <div className="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center mb-2 text-rose-400">
+                                        <MapPin className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Tap on the Body</h3>
+                                    <p className="text-slate-300 text-sm leading-relaxed">
+                                        Click directly on the 3D model where your mole is located to place a marker.
+                                    </p>
+                                    <div className="animate-pulse text-xs text-rose-400 font-bold uppercase tracking-wider mt-2">
+                                        Tap anywhere on the model...
+                                    </div>
+                                </>
+                            )}
+
+                            {/* STEP 5: Name Your Mole */}
+                            {tutorialStep === 5 && (
+                                <>
+                                    <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-2 text-amber-400">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Name Your Mole</h3>
+                                    <p className="text-slate-300 text-sm leading-relaxed">
+                                        Give this mole a descriptive name (like "Left Shoulder" or "Back of Leg") and tap <span className="text-rose-400 font-bold">Add Mole</span>.
+                                    </p>
+                                    <div className="animate-pulse text-xs text-amber-400 font-bold uppercase tracking-wider mt-2">
+                                        Fill in the form below...
+                                    </div>
+                                </>
+                            )}
+
+                            {/* STEP 6: Record Checkup */}
+                            {tutorialStep === 6 && (
+                                <>
+                                    <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center mb-2 text-purple-400">
+                                        <Camera className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Record Check-ups</h3>
+                                    <p className="text-slate-300 text-sm leading-relaxed">
+                                        Tap on any mole in your list, then click <span className="text-rose-400 font-bold whitespace-nowrap">+ New Check-up</span> to add photos, measurements, and track changes over time.
+                                    </p>
+                                </>
+                            )}
+
                             {/* Step Indicator */}
                             {tutorialStep > 0 && (
                                 <div className="flex gap-1.5 pt-2">
-                                    {[1, 2, 3, 4].map((step) => (
+                                    {[1, 2, 3, 4, 5, 6].map((step) => (
                                         <div
                                             key={step}
                                             className={`h-1.5 rounded-full transition-all duration-300 ${step === tutorialStep ? "w-6 bg-white" : "w-1.5 bg-white/20"

@@ -5,7 +5,7 @@ import {
     Camera, Calendar, MapPin, Search, ChevronRight, Plus, X,
     Trash2, Edit3, Settings, Shield, Lock, Unlock, Download, Upload, RefreshCw,
     Check, ArrowUpDown, SortAsc, SortDesc, ArrowLeftRight, Bell, ShieldCheck,
-    AlertTriangle, Eye, EyeOff, Info, Delete
+    AlertTriangle, Eye, EyeOff, Info, Delete, Star
 } from "lucide-react";
 import { Camera as CapCamera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -59,6 +59,7 @@ export default function UIOverlay() {
     const sortDirection = useAppStore((s) => s.sortDirection);
     const setSortMode = useAppStore((s) => s.setSortMode);
     const setSortDirection = useAppStore((s) => s.setSortDirection);
+    const [filterStarred, setFilterStarred] = useState(false);
 
     // Security & Data State
     const [showSecurity, setShowSecurity] = useState(false);
@@ -97,7 +98,6 @@ export default function UIOverlay() {
     const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
     const [expandedMoleId, setExpandedMoleId] = useState<number | null>(null);
     const [comparisonImageUrl, setComparisonImageUrl] = useState<string | null>(null);
-    const [showABCDEModal, setShowABCDEModal] = useState(false);
     const [abcdeChecked, setAbcdeChecked] = useState<Set<string>>(new Set());
 
     const moles = useLiveQuery(() => db.moles.where('gender').equals(gender).toArray(), [gender]);
@@ -106,7 +106,12 @@ export default function UIOverlay() {
     const sortedMoles = useMemo(() => {
         if (!moles) return [];
 
-        const sorted = [...moles].map(mole => {
+        let filtered = [...moles];
+        if (filterStarred) {
+            filtered = filtered.filter(m => m.starred);
+        }
+
+        const sorted = filtered.map(mole => {
             const moleEntries = allEntries.filter(e => e.moleId === mole.id);
             const lastUpdated = moleEntries.length > 0
                 ? Math.max(...moleEntries.map(e => new Date(e.date).getTime()))
@@ -127,7 +132,7 @@ export default function UIOverlay() {
         });
 
         return sorted;
-    }, [moles, allEntries, sortMode, sortDirection]);
+    }, [moles, allEntries, sortMode, sortDirection, filterStarred]);
 
     // Check if this is first launch
     useEffect(() => {
@@ -284,6 +289,15 @@ export default function UIOverlay() {
         setEntryABCDE(new Set());
         setEntryPhoto(null);
         setEditingEntryId(null);
+    };
+
+    const handleToggleStar = async (id: number, currentStarred: boolean) => {
+        try {
+            await haptics.selection();
+            await db.moles.update(id, { starred: !currentStarred });
+        } catch (error) {
+            console.error("Failed to toggle star:", error);
+        }
     };
 
     const handleEntryPhotoUpload = async (source: CameraSource = CameraSource.Prompt) => {
@@ -532,13 +546,6 @@ export default function UIOverlay() {
                                             {entryABCDE.size} / 5
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setShowABCDEModal(true)}
-                                        className="text-[10px] font-bold text-blue-400 uppercase tracking-widest hover:text-blue-300 flex items-center gap-1.5"
-                                    >
-                                        <Info className="w-3 h-3" />
-                                        Guide
-                                    </button>
                                 </div>
                                 <div className="space-y-2">
                                     {ABCDE_ITEMS.map((item) => {
@@ -557,14 +564,19 @@ export default function UIOverlay() {
                                                     : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
                                                     }`}
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black transition-colors ${isChecked ? 'bg-rose-500 text-white shadow-md' : 'bg-slate-900 text-slate-500'
+                                                <div className="flex items-center gap-3 pr-2">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0 transition-colors ${isChecked ? 'bg-rose-500 text-white shadow-md' : 'bg-slate-900 text-slate-500'
                                                         }`}>
                                                         {isChecked ? <Check className="w-4 h-4" /> : item.letter}
                                                     </div>
-                                                    <span className={`text-sm font-bold ${isChecked ? 'text-white' : 'text-slate-400'}`}>
-                                                        {item.title}
-                                                    </span>
+                                                    <div className="text-left">
+                                                        <p className={`text-sm font-bold ${isChecked ? 'text-white' : 'text-slate-300'}`}>
+                                                            {item.title}
+                                                        </p>
+                                                        <p className={`text-[10px] leading-tight mt-0.5 ${isChecked ? 'text-rose-200/70' : 'text-slate-500'}`}>
+                                                            {item.desc}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                                 {isChecked && (
                                                     <div className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">
@@ -927,94 +939,6 @@ export default function UIOverlay() {
                     </div>
                 </div>
             )}
-            {/* ABCDE Guide Modal */}
-            {showABCDEModal && (
-                <div
-                    className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto z-[120] flex items-end sm:items-center justify-center px-4 pb-12 pt-4"
-                    onClick={() => {
-                        setShowABCDEModal(false);
-                        setAbcdeChecked(new Set());
-                    }}
-                >
-                    <div
-                        className="glass bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-md w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-slide-up"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between mb-6">
-                            <h4 className="text-xl font-bold text-white flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                                    <Info className="w-5 h-5 text-blue-400" />
-                                </div>
-                                ABCDE Guide
-                            </h4>
-                            <button
-                                onClick={() => {
-                                    setShowABCDEModal(false);
-                                    setAbcdeChecked(new Set());
-                                }}
-                                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto space-y-3 font-inter text-left pr-2 -mr-2">
-                            {ABCDE_ITEMS.map((item) => {
-                                const isChecked = abcdeChecked.has(item.letter);
-                                return (
-                                    <button
-                                        key={item.letter}
-                                        onClick={() => {
-                                            const newChecked = new Set(abcdeChecked);
-                                            if (isChecked) {
-                                                newChecked.delete(item.letter);
-                                            } else {
-                                                newChecked.add(item.letter);
-                                            }
-                                            setAbcdeChecked(newChecked);
-                                        }}
-                                        className={`w-full flex gap-4 p-3 rounded-2xl transition-all border text-left ${isChecked
-                                            ? 'bg-green-500/10 border-green-500/30'
-                                            : 'bg-white/5 border-transparent hover:border-white/5'
-                                            }`}
-                                    >
-                                        <div className={`w-10 h-10 rounded-xl flex flex-shrink-0 items-center justify-center text-xl font-black shadow-inner transition-colors ${isChecked
-                                            ? 'bg-green-500/20 text-green-400'
-                                            : 'bg-white/5 text-rose-500'
-                                            }`}>
-                                            {isChecked ? '✓' : item.letter}
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-bold text-white text-sm">{item.title}</p>
-                                            <p className="text-slate-400 text-xs leading-relaxed">{item.desc}</p>
-                                        </div>
-                                    </button>
-                                );
-                            })}
-
-                            <div className="pt-4 border-t border-white/5 font-inter text-left">
-                                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex gap-3 text-rose-200">
-                                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                                    <p className="text-[10px] uppercase font-bold tracking-wider leading-relaxed">
-                                        Self-checks are for tracking only. Consult a doctor for any new or changing spots.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => {
-                                setShowABCDEModal(false);
-                                setAbcdeChecked(new Set());
-                            }}
-                            className="w-full py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all shadow-lg shadow-rose-500/20 mt-6 active:scale-[0.98] text-sm uppercase tracking-widest"
-                        >
-                            Got it
-                        </button>
-                    </div>
-                </div>
-            )
-            }
 
             {/* Mole Deletion Confirmation */}
             {
@@ -1123,72 +1047,70 @@ export default function UIOverlay() {
                                                 setPinError(false);
 
                                                 if (newPin.length === 4) {
-                                                    setTimeout(() => {
-                                                        const stored = localStorage.getItem('app-lock-pin');
+                                                    const stored = localStorage.getItem('app-lock-pin');
 
-                                                        // SETUP FLOW
-                                                        if (pinFlow === 'setup') {
-                                                            if (pinStep === 'enter') {
-                                                                setTempPin(newPin);
-                                                                setPinInput("");
-                                                                setPinStep('confirm');
-                                                            } else if (pinStep === 'confirm') {
-                                                                if (newPin === tempPin) {
-                                                                    localStorage.setItem('app-lock-pin', newPin);
-                                                                    setHasPin(true);
-                                                                    setShowPinSetup(false);
-                                                                    haptics.success();
-                                                                } else {
-                                                                    setPinError(true);
-                                                                    setPinInput("");
-                                                                    setPinStep('enter');
-                                                                    setTempPin("");
-                                                                }
-                                                            }
-                                                        }
-                                                        // REMOVE FLOW
-                                                        else if (pinFlow === 'remove') {
-                                                            if (newPin === stored) {
-                                                                localStorage.removeItem('app-lock-pin');
-                                                                setHasPin(false);
+                                                    // SETUP FLOW
+                                                    if (pinFlow === 'setup') {
+                                                        if (pinStep === 'enter') {
+                                                            setTempPin(newPin);
+                                                            setPinInput("");
+                                                            setPinStep('confirm');
+                                                        } else if (pinStep === 'confirm') {
+                                                            if (newPin === tempPin) {
+                                                                localStorage.setItem('app-lock-pin', newPin);
+                                                                setHasPin(true);
                                                                 setShowPinSetup(false);
                                                                 haptics.success();
                                                             } else {
                                                                 setPinError(true);
                                                                 setPinInput("");
+                                                                setPinStep('enter');
+                                                                setTempPin("");
+                                                            }
+                                                        }
+                                                    }
+                                                    // REMOVE FLOW
+                                                    else if (pinFlow === 'remove') {
+                                                        if (newPin === stored) {
+                                                            localStorage.removeItem('app-lock-pin');
+                                                            setHasPin(false);
+                                                            setShowPinSetup(false);
+                                                            haptics.success();
+                                                        } else {
+                                                            setPinError(true);
+                                                            setPinInput("");
+                                                            haptics.error();
+                                                        }
+                                                    }
+                                                    // CHANGE FLOW
+                                                    else if (pinFlow === 'change') {
+                                                        if (pinStep === 'current') {
+                                                            if (newPin === stored) {
+                                                                setPinInput("");
+                                                                setPinStep('enter');
+                                                            } else {
+                                                                setPinError(true);
+                                                                setPinInput("");
+                                                                haptics.error();
+                                                            }
+                                                        } else if (pinStep === 'enter') {
+                                                            setTempPin(newPin);
+                                                            setPinInput("");
+                                                            setPinStep('confirm');
+                                                        } else if (pinStep === 'confirm') {
+                                                            if (newPin === tempPin) {
+                                                                localStorage.setItem('app-lock-pin', newPin);
+                                                                setShowPinSetup(false);
+                                                                haptics.success();
+                                                            } else {
+                                                                setPinError(true);
+                                                                setPinInput("");
+                                                                setPinStep('enter');
+                                                                setTempPin("");
                                                                 haptics.error();
                                                             }
                                                         }
-                                                        // CHANGE FLOW
-                                                        else if (pinFlow === 'change') {
-                                                            if (pinStep === 'current') {
-                                                                if (newPin === stored) {
-                                                                    setPinInput("");
-                                                                    setPinStep('enter');
-                                                                } else {
-                                                                    setPinError(true);
-                                                                    setPinInput("");
-                                                                    haptics.error();
-                                                                }
-                                                            } else if (pinStep === 'enter') {
-                                                                setTempPin(newPin);
-                                                                setPinInput("");
-                                                                setPinStep('confirm');
-                                                            } else if (pinStep === 'confirm') {
-                                                                if (newPin === tempPin) {
-                                                                    localStorage.setItem('app-lock-pin', newPin);
-                                                                    setShowPinSetup(false);
-                                                                    haptics.success();
-                                                                } else {
-                                                                    setPinError(true);
-                                                                    setPinInput("");
-                                                                    setPinStep('enter');
-                                                                    setTempPin("");
-                                                                    haptics.error();
-                                                                }
-                                                            }
-                                                        }
-                                                    }, 200);
+                                                    }
                                                 }
                                             }
                                         }}
@@ -1283,6 +1205,9 @@ export default function UIOverlay() {
                     setSelectedImageUrl(url);
                     setExpandedMoleId(moleId);
                 }}
+                filterStarred={filterStarred}
+                setFilterStarred={setFilterStarred}
+                handleToggleStar={handleToggleStar}
             />
 
             {/* Expanded Image View */}
@@ -1311,7 +1236,8 @@ function DraggableBottomSheet({
     sortMode, sortDirection, setSortMode, setSortDirection,
     handleDeleteMole, handleUpdateMoleLabel, handleDeleteEntry,
     startEditEntry, editingMoleId, setEditingMoleId, editLabel, setEditLabel,
-    setShowAddEntry, resetEntryForm, setMenuHeight, onExpandImage
+    setShowAddEntry, resetEntryForm, setMenuHeight, onExpandImage,
+    filterStarred, setFilterStarred, handleToggleStar
 }: {
     // ... other props
     onExpandImage: (url: string, moleId: number) => void
@@ -1427,6 +1353,7 @@ function DraggableBottomSheet({
                                 editLabel={editLabel}
                                 setEditLabel={setEditLabel}
                                 onExpandImage={onExpandImage}
+                                handleToggleStar={handleToggleStar}
                             />
                         ) : (
                             <MoleListPanel
@@ -1437,6 +1364,9 @@ function DraggableBottomSheet({
                                 setSortMode={setSortMode}
                                 setSortDirection={setSortDirection}
                                 onExpandImage={onExpandImage}
+                                filterStarred={filterStarred}
+                                setFilterStarred={setFilterStarred}
+                                handleToggleStar={handleToggleStar}
                             />
                         )}
                     </div>
@@ -1452,14 +1382,20 @@ function MoleListPanel({
     sortDirection,
     setSortMode,
     setSortDirection,
-    onExpandImage
+    onExpandImage,
+    filterStarred,
+    setFilterStarred,
+    handleToggleStar
 }: {
     moles: any[] | undefined,
     sortMode: 'updated' | 'label',
     sortDirection: 'asc' | 'desc',
     setSortMode: (m: 'updated' | 'label') => void,
     setSortDirection: (d: 'asc' | 'desc') => void,
-    onExpandImage: (url: string, moleId: number) => void
+    onExpandImage: (url: string, moleId: number) => void,
+    filterStarred: boolean,
+    setFilterStarred: (v: boolean) => void,
+    handleToggleStar: (id: number, current: boolean) => void
 }) {
     const setSelectedMoleId = useAppStore((s: AppState) => s.setSelectedMoleId);
     const tutorialStep = useAppStore((s: AppState) => s.tutorialStep);
@@ -1478,6 +1414,15 @@ function MoleListPanel({
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => { haptics.selection(); setFilterStarred(!filterStarred); }}
+                        className={`p-2 rounded-xl border transition-all flex items-center gap-2 ${filterStarred ? 'glass bg-amber-500/20 border-amber-500/50 text-amber-500' : 'glass bg-white/5 border-white/5 text-slate-400 hover:text-white'}`}
+                        title="Filter starred moles"
+                    >
+                        <Star className={`w-4 h-4 ${filterStarred ? 'fill-amber-500' : ''}`} />
+                        <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Starred</span>
+                    </button>
+
                     <div className="relative">
                         <button
                             onClick={() => setShowSortMenu(!showSortMenu)}
@@ -1565,10 +1510,10 @@ function MoleListPanel({
             ) : (
                 <div className="overflow-y-auto -mx-2 px-2 space-y-2 pb-safe">
                     {moles?.map((mole: any) => (
-                        <button
+                        <div
                             key={mole.id}
                             onClick={() => setSelectedMoleId(mole.id as number)}
-                            className="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/5 transition-all group"
+                            className="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/5 transition-all group cursor-pointer"
                         >
                             <div className="flex items-center gap-4">
                                 <MoleThumbnail moleId={mole.id!} onExpandImage={onExpandImage} />
@@ -1580,8 +1525,19 @@ function MoleListPanel({
                                     </p>
                                 </div>
                             </div>
-                            <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-slate-400" />
-                        </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleStar(mole.id!, !!mole.starred);
+                                    }}
+                                    className={`p-2 rounded-full transition-colors ${mole.starred ? 'text-amber-500 bg-amber-500/10' : 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10'}`}
+                                >
+                                    <Star className={`w-4 h-4 ${mole.starred ? 'fill-amber-500' : ''}`} />
+                                </button>
+                                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-slate-400" />
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}
@@ -1708,7 +1664,8 @@ function MoleDetailPanel({
     setEditingMoleId,
     editLabel,
     setEditLabel,
-    onExpandImage
+    onExpandImage,
+    handleToggleStar
 }: {
     onAddEntry: () => void,
     onDeleteMole: (id: number) => void,
@@ -1719,7 +1676,8 @@ function MoleDetailPanel({
     setEditingMoleId: (id: number | null) => void,
     editLabel: string,
     setEditLabel: (s: string) => void,
-    onExpandImage: (url: string, moleId: number) => void
+    onExpandImage: (url: string, moleId: number) => void,
+    handleToggleStar: (id: number, current: boolean) => void
 }) {
     const selectedMoleId = useAppStore((s: AppState) => s.selectedMoleId);
     const setSelectedMoleId = useAppStore((s: AppState) => s.setSelectedMoleId);
@@ -1765,6 +1723,12 @@ function MoleDetailPanel({
                                 className="p-1 text-slate-500 hover:text-white"
                             >
                                 <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => handleToggleStar(activeMole.id!, !!activeMole.starred)}
+                                className={`p-1 transition-colors ${activeMole.starred ? 'text-amber-500' : 'text-slate-500 hover:text-amber-500'}`}
+                            >
+                                <Star className={`w-4 h-4 ${activeMole.starred ? 'fill-amber-500' : ''}`} />
                             </button>
                         </div>
                     )}

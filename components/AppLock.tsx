@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Lock, Unlock, Delete } from 'lucide-react';
+import { haptics } from '@/utils/haptics';
 
 export default function AppLock({ children }: { children: React.ReactNode }) {
     const [isLocked, setIsLocked] = useState(true);
@@ -57,7 +58,7 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
                 setError(true);
                 setPin("");
                 // Haptic feedback could go here
-                if (navigator.vibrate) navigator.vibrate(200);
+                haptics.error();
             }
         }
     }, [pin, hasPin]);

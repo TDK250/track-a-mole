@@ -696,7 +696,7 @@ export default function UIOverlay() {
                                 <div className="flex flex-col h-full overflow-hidden">
                                     <div className="flex items-center justify-between mb-6 shrink-0">
                                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Settings</h2>
-                                        <button onClick={() => setShowSettings(false)} className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+                                        <button onClick={() => setShowSettings(false)} className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
                                             <X className="w-5 h-5" />
                                         </button>
                                     </div>
@@ -820,7 +820,7 @@ export default function UIOverlay() {
                                                         setPinInput("");
                                                         setShowPinSetup(true);
                                                     }}
-                                                    className="w-full text-xs font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-800 hover:bg-slate-700 py-2 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+                                                    className="w-full text-xs font-bold uppercase tracking-wider bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 py-2 rounded-lg transition-colors border border-slate-200 dark:border-white/5"
                                                     style={{ color: accentColor }}
                                                 >
                                                     Change PIN
@@ -832,7 +832,7 @@ export default function UIOverlay() {
                                         <div className="space-y-2">
                                             <button
                                                 onClick={() => { setShowSecurity(true); }}
-                                                className="w-full p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:bg-slate-800 transition-colors flex items-center justify-between group"
+                                                className="w-full p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors flex items-center justify-between group"
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <ShieldCheck className="w-4 h-4" style={{ color: accentColor }} />
@@ -844,14 +844,14 @@ export default function UIOverlay() {
                                             <div className="grid grid-cols-2 gap-2">
                                                 <button
                                                     onClick={() => setShowExportWindow(true)}
-                                                    className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:bg-slate-800 transition-colors flex items-center justify-center gap-2 py-4"
+                                                    className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2 py-4"
                                                 >
                                                     <Download className="w-4 h-4" style={{ color: accentColor }} />
                                                     <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Export</span>
                                                 </button>
                                                 <button
                                                     onClick={() => fileInputRef.current?.click()}
-                                                    className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:bg-slate-800 transition-colors flex items-center justify-center gap-2 py-4"
+                                                    className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2 py-4"
                                                 >
                                                     <Upload className="w-4 h-4" style={{ color: accentColor }} />
                                                     <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Import</span>

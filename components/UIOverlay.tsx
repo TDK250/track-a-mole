@@ -125,6 +125,7 @@ export default function UIOverlay() {
     const [abcdeChecked, setAbcdeChecked] = useState<Set<string>>(new Set());
 
     const [newType, setNewType] = useState<'mole' | 'eczema' | 'other'>('mole');
+    const { tempMoleCount, setTempMoleCount, tempMoleSpread, setTempMoleSpread } = useAppStore();
     const [entrySeverity, setEntrySeverity] = useState<number>(5);
     const [entrySymptoms, setEntrySymptoms] = useState<Set<string>>(new Set());
     const [entryFlareUp, setEntryFlareUp] = useState(false);
@@ -287,6 +288,7 @@ export default function UIOverlay() {
         if (!tempMolePosition || !newLabel) return;
         try {
             const tempMoleNormal = useAppStore.getState().tempMoleNormal;
+            const tempMoleSpread = useAppStore.getState().tempMoleSpread;
             await haptics.selection();
             const id = await db.moles.add({
                 label: newLabel,
@@ -294,7 +296,9 @@ export default function UIOverlay() {
                 position: tempMolePosition,
                 normal: tempMoleNormal || undefined,
                 createdAt: Date.now(),
-                type: newType
+                type: newType,
+                count: tempMoleCount,
+                spread: tempMoleSpread
             });
             console.log("Mole added with ID:", id);
 
@@ -303,6 +307,8 @@ export default function UIOverlay() {
             setTempMoleNormal(null);
             setNewLabel("");
             setNewType("mole");
+            setTempMoleCount(1);
+            setTempMoleSpread(2.0);
             setIsAddingMole(false);
 
             // Re-select the newly created mole immediately to show detail view
@@ -1394,6 +1400,8 @@ function DraggableBottomSheet({
     filterStarred: boolean, setFilterStarred: (v: boolean) => void, handleToggleStar: (id: number, current: boolean) => void,
     newType: 'mole' | 'eczema' | 'other', setNewType: (t: 'mole' | 'eczema' | 'other') => void
 }) {
+    const tempMoleCount = useAppStore((s: AppState) => s.tempMoleCount);
+    const setTempMoleCount = useAppStore((s: AppState) => s.setTempMoleCount);
     const controls = useAnimation();
     const containerRef = useRef<HTMLDivElement>(null);
     const [contentHeight, setContentHeight] = useState(500); // Approximate default
@@ -1796,6 +1804,10 @@ function MoleThumbnail({ moleId, onExpandImage }: { moleId: number, onExpandImag
 
 function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () => void, label: string, setLabel: (v: string) => void, type: string, setType: (v: any) => void }) {
     const tempMolePosition = useAppStore((s: AppState) => s.tempMolePosition);
+    const tempMoleCount = useAppStore((s: AppState) => s.tempMoleCount);
+    const setTempMoleCount = useAppStore((s: AppState) => s.setTempMoleCount);
+    const tempMoleSpread = useAppStore((s: AppState) => s.tempMoleSpread);
+    const setTempMoleSpread = useAppStore((s: AppState) => s.setTempMoleSpread);
     const setIsAddingMole = useAppStore((s: AppState) => s.setIsAddingMole);
     const setTempMolePosition = useAppStore((s: AppState) => s.setTempMolePosition);
     const accentColor = useAppStore((s: AppState) => s.accentColor);
@@ -1813,6 +1825,8 @@ function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () =
                     onClick={() => {
                         useAppStore.getState().setIsAddingMole(false);
                         useAppStore.getState().setTempMolePosition(null);
+                        useAppStore.getState().setTempMoleCount(1);
+                        useAppStore.getState().setTempMoleSpread(2.0);
                         setLabel("");
                     }}
                     className="p-2 -mr-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white rounded-full hover:bg-white/10 transition-colors"
@@ -1900,6 +1914,80 @@ function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () =
                                 }}
                                 autoFocus
                             />
+
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between pl-1">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider font-inter">Number of spots (Cluster)</p>
+                                    <span
+                                        className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm"
+                                        style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
+                                    >
+                                        {tempMoleCount === 'several' ? 'Several Spots' : tempMoleCount === 1 ? 'Single Spot' : `${tempMoleCount} Spots`}
+                                    </span>
+                                </div>
+                                <div className="px-2">
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="11"
+                                        step="1"
+                                        value={tempMoleCount === 'several' ? 11 : tempMoleCount}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value);
+                                            haptics.selection();
+                                            setTempMoleCount(val === 11 ? 'several' : val);
+                                        }}
+                                        className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-current"
+                                        style={{ color: accentColor }}
+                                    />
+                                    <div className="flex justify-between mt-2 px-1">
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '...'].map((label, i) => (
+                                            <span key={i} className="text-[10px] font-bold text-slate-400 dark:text-slate-600 w-4 text-center">
+                                                {label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                {tempMoleCount === 'several' && (
+                                    <p className="text-[10px] text-slate-500 pl-1 font-medium animate-fade-in italic">
+                                        "Several" spots will be displayed as a distinct cluster marker.
+                                    </p>
+                                )}
+
+                                {tempMoleCount !== 1 && (
+                                    <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        <div className="flex items-center justify-between pl-1">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider font-inter">Cluster Spread (Density)</p>
+                                            <span
+                                                className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm"
+                                                style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
+                                            >
+                                                {tempMoleSpread < 0.8 ? 'Dense' : tempMoleSpread > 1.2 ? 'Spread' : 'Normal'}
+                                            </span>
+                                        </div>
+                                        <div className="px-2">
+                                            <input
+                                                type="range"
+                                                min="0.8"
+                                                max="6.0"
+                                                step="0.2"
+                                                value={tempMoleSpread}
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value);
+                                                    haptics.selection();
+                                                    setTempMoleSpread(val);
+                                                }}
+                                                className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-current"
+                                                style={{ color: accentColor }}
+                                            />
+                                            <div className="flex justify-between mt-2 px-1">
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">Tight</span>
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">Loose</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

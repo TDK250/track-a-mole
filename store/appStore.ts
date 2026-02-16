@@ -11,6 +11,10 @@ export interface AppState {
     setTempMolePosition: (pos: [number, number, number] | null) => void;
     tempMoleNormal: [number, number, number] | null;
     setTempMoleNormal: (normal: [number, number, number] | null) => void;
+    tempMoleCount: number | 'several';
+    setTempMoleCount: (count: number | 'several') => void;
+    tempMoleSpread: number;
+    setTempMoleSpread: (spread: number) => void;
 
     // Smart Reminder Settings
     smartRemindersEnabled: boolean;
@@ -86,6 +90,10 @@ export const useAppStore = create<AppState>((set) => {
         setTempMolePosition: (pos) => set({ tempMolePosition: pos }),
         tempMoleNormal: null,
         setTempMoleNormal: (normal) => set({ tempMoleNormal: normal }),
+        tempMoleCount: 1,
+        setTempMoleCount: (count) => set({ tempMoleCount: count }),
+        tempMoleSpread: 2.0,
+        setTempMoleSpread: (spread) => set({ tempMoleSpread: spread }),
 
         // Smart Reminders
         smartRemindersEnabled: savedSmartReminders,

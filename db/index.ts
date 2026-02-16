@@ -9,6 +9,8 @@ export interface Mole {
     createdAt: number;
     starred?: boolean;
     type?: 'mole' | 'eczema' | 'acne' | 'psoriasis' | 'rash' | 'other';
+    count?: number | 'several';
+    spread?: number;
 }
 
 export interface MoleEntry {

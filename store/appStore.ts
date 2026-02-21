@@ -44,11 +44,10 @@ export interface AppState {
     setSortDirection: (direction: 'asc' | 'desc') => void;
 
     // Tutorial State
-    tutorialStep: number; // 0=none, 1=welcome, 2=camera, 3=add, 4=menu
-    setTutorialStep: (step: number) => void;
+    showTutorial: boolean;
+    setShowTutorial: (show: boolean) => void;
+    hasCompletedTutorial: boolean;
     completeTutorial: () => void;
-    hasInteractedWithModel: boolean;
-    setHasInteractedWithModel: (has: boolean) => void;
     theme: 'light' | 'dark';
     setTheme: (theme: 'light' | 'dark') => void;
     accentColor: string;
@@ -120,14 +119,13 @@ export const useAppStore = create<AppState>((set) => {
         setMenuHeight: (height) => set({ menuHeight: height }),
 
         // Tutorial
-        tutorialStep: 0, // Default to 0, logic in UIOverlay will trigger step 1 if needed
-        setTutorialStep: (step: number) => set({ tutorialStep: step }),
+        showTutorial: !hasCompletedTutorial,
+        setShowTutorial: (show) => set({ showTutorial: show }),
+        hasCompletedTutorial: hasCompletedTutorial,
         completeTutorial: () => {
-            set({ tutorialStep: 0 });
+            set({ showTutorial: false, hasCompletedTutorial: true });
             if (isClient) localStorage.setItem('tutorial-completed', 'true');
         },
-        hasInteractedWithModel: false,
-        setHasInteractedWithModel: (has: boolean) => set({ hasInteractedWithModel: has }),
 
         // Sorting
         sortMode: savedSortMode || 'updated',

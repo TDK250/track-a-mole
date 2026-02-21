@@ -24,7 +24,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { NotificationService } from "@/services/notificationService";
 import { ImportExportService } from "@/services/importExportService";
 import { motion, useMotionValue, useTransform, PanInfo, useAnimation } from "framer-motion";
-import TutorialOverlay from "./TutorialOverlay";
 import ExportPDFModal from "./ExportPDFModal";
 
 const ECZEMA_SYMPTOMS = [
@@ -64,9 +63,10 @@ export default function UIOverlay() {
     const setTempMoleNormal = useAppStore((s) => s.setTempMoleNormal);
     const triggerCameraReset = useAppStore((s) => s.triggerCameraReset);
     const setSmartRemindersEnabled = useAppStore((s) => s.setSmartRemindersEnabled);
-    const hasCompletedTutorial = useAppStore((s) => s.tutorialStep === 0 && typeof window !== 'undefined' && localStorage.getItem('tutorial-completed') === 'true');
-    const tutorialStep = useAppStore((s) => s.tutorialStep);
-    const setTutorialStep = useAppStore((s) => s.setTutorialStep);
+    const hasCompletedTutorial = useAppStore((s) => s.hasCompletedTutorial);
+    const showTutorial = useAppStore((s) => s.showTutorial);
+    const setShowTutorial = useAppStore((s) => s.setShowTutorial);
+    const completeTutorial = useAppStore((s) => s.completeTutorial);
     const theme = useAppStore((s) => s.theme);
     const setTheme = useAppStore((s) => s.setTheme);
     const accentColor = useAppStore((s) => s.accentColor);
@@ -89,6 +89,7 @@ export default function UIOverlay() {
     const [showExportWindow, setShowExportWindow] = useState(false);
     const [showImportWindow, setShowImportWindow] = useState(false);
     const [showPDFExport, setShowPDFExport] = useState(false);
+    const [showCredits, setShowCredits] = useState(false);
     const [exportPassword, setExportPassword] = useState("");
     const [importPassword, setImportPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -183,21 +184,11 @@ export default function UIOverlay() {
 
     // Handle tutorial start - consolidated into single effect with guard
     useEffect(() => {
-        /* Temporarily disabled tutorial
-        const tutorialDone = localStorage.getItem('tutorial-completed');
-        const hasSelectedGender = localStorage.getItem('gender-selected');
-
-        // Only start tutorial if:
-        // 1. Tutorial hasn't been completed
-        // 2. Gender has been selected (not in onboarding)
-        // 3. Onboarding is closed
-        // 4. We haven't already initialized the tutorial
-        if (!tutorialDone && hasSelectedGender && !showOnboarding && !tutorialInitializedRef.current) {
+        if (!hasCompletedTutorial && !showOnboarding && !tutorialInitializedRef.current) {
             tutorialInitializedRef.current = true;
-            setTutorialStep(1);
+            setShowTutorial(true);
         }
-        */
-    }, [showOnboarding]); // Only re-run when showOnboarding changes
+    }, [showOnboarding, hasCompletedTutorial, setShowTutorial]);
 
     // Handle Notification Scheduling
     useEffect(() => {
@@ -841,6 +832,17 @@ export default function UIOverlay() {
                                                 <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-900 dark:text-white transition-colors" />
                                             </button>
 
+                                            <button
+                                                onClick={() => { setShowCredits(true); }}
+                                                className="w-full p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors flex items-center justify-between group"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Info className="w-4 h-4" style={{ color: accentColor }} />
+                                                    <span className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">About & Credits</span>
+                                                </div>
+                                                <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-900 dark:text-white transition-colors" />
+                                            </button>
+
                                             <div className="grid grid-cols-2 gap-2">
                                                 <button
                                                     onClick={() => setShowExportWindow(true)}
@@ -988,6 +990,55 @@ export default function UIOverlay() {
                                         </p>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Credits Modal */}
+            {
+                showCredits && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[70] flex items-end sm:items-center justify-center px-4 pb-12 pt-4">
+                        <div
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-slide-up"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between mb-6 shrink-0">
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <Info className="w-6 h-6 text-blue-400" />
+                                    About & Credits
+                                </h2>
+                                <button
+                                    onClick={() => setShowCredits(false)}
+                                    className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white rounded-full hover:bg-white/10 transition-colors"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto space-y-6 text-slate-600 dark:text-slate-400 pr-1">
+                                <section>
+                                    <h3 className="text-slate-900 dark:text-white font-bold mb-2 text-lg">3D Models</h3>
+                                    <p className="text-sm leading-relaxed mb-2">
+                                        The base 3D human models used for tracking are provided by TurboSquid:
+                                    </p>
+                                    <a
+                                        href="https://www.turbosquid.com/3d-models/3d-male-and-female-base-model-free-model-1780435?dd_referrer="
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 break-words block p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl"
+                                    >
+                                        Male and Female Base Model (Free) by TurboSquid
+                                    </a>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-slate-900 dark:text-white font-bold mb-2 text-lg">Open Source</h3>
+                                    <p className="text-sm leading-relaxed">
+                                        Powered by modern open-source web technologies including <span className="font-medium text-slate-700 dark:text-slate-300">React, Next.js, Capacitor, Three.js</span> and <span className="font-medium text-slate-700 dark:text-slate-300">Dexie</span>.
+                                    </p>
+                                </section>
                             </div>
                         </div>
                     </div>
@@ -1298,7 +1349,21 @@ export default function UIOverlay() {
             >
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span className="text-2xl" style={{ color: accentColor }}>●</span>
+                        <motion.button
+                            onClick={() => { haptics.selection(); setShowTutorial(true); }}
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ duration: 0.8, delay: 0.2, type: "spring", stiffness: 200 }}
+                            className="relative flex h-8 w-8 items-center justify-center rounded-full transition-transform active:scale-95 mr-1 group"
+                            title="How to use Track-A-Mole"
+                        >
+                            {!hasCompletedTutorial && (
+                                <span className="absolute inline-flex h-[150%] w-[150%] rounded-full opacity-60 animate-ping" style={{ backgroundColor: accentColor, animationDuration: '2.5s' }}></span>
+                            )}
+                            <span className="relative inline-flex rounded-full h-8 w-8 items-center justify-center bg-white dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700">
+                                <Info className="w-5 h-5" style={{ color: accentColor }} />
+                            </span>
+                        </motion.button>
                         <span className="tracking-tight">Track-A-Mole</span>
                     </h1>
 
@@ -1325,7 +1390,85 @@ export default function UIOverlay() {
 
 
             {/* Main Content Area - Bottom Sheet */}
-            <TutorialOverlay />
+            {/* Static Tutorial Modal */}
+            {showTutorial && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md pointer-events-auto z-[70] flex items-center justify-center px-4">
+                    <div
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col max-h-[85vh] animate-slide-up"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-8">
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-500/10 text-blue-500">
+                                    <Info className="w-6 h-6" />
+                                </div>
+                                How to Use
+                            </h2>
+                            <button
+                                onClick={() => setShowTutorial(false)}
+                                className="p-2 text-slate-500 hover:text-slate-900 dark:text-white rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-6 pr-2 mb-8 border border-white/10 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/30 font-inter">
+                            <div className="flex gap-4 items-start">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 text-sm" style={{ backgroundColor: accentColor }}>1</div>
+                                <div className="space-y-1">
+                                    <h3 className="font-bold text-slate-900 dark:text-white pb-1">Explore the 3D Body</h3>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                                        Use your fingers to interact with the 3D model canvas:
+                                    </p>
+                                    <ul className="text-sm text-slate-600 dark:text-slate-400 list-disc pl-4 space-y-2 pt-1">
+                                        <li><strong>Swipe</strong> with one finger to rotate.</li>
+                                        <li><strong>Pinch</strong> to zoom in and out.</li>
+                                        <li><strong>Drag with two fingers</strong> to pan around the body.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 items-start">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 text-sm" style={{ backgroundColor: accentColor }}>2</div>
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-slate-900 dark:text-white">Track a New Spot</h3>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                                        Tap the <strong className="px-2 py-1 mx-0.5 rounded-lg bg-white dark:bg-slate-900 border text-xs shadow-sm">+</strong> button below, then accurately tap anywhere on the 3D model to place a marker.
+                                    </p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed opacity-90">
+                                        You can label the spot and specify if it's a single bump or a broader cluster.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 items-start">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 text-sm" style={{ backgroundColor: accentColor }}>3</div>
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-slate-900 dark:text-white">Record Visual History</h3>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                                        Select any placed marker to view its details. From there, you can tap <strong>Record New Check-up</strong> to track its progression.
+                                    </p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed opacity-90">
+                                        Take a photo and log its size, texture, and notes using the standard medical ABCDE checklist for better clinical context.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                haptics.selection();
+                                completeTutorial();
+                            }}
+                            className="w-full text-white py-4 rounded-2xl font-bold transition-all shadow-lg active:scale-[0.98] text-lg"
+                            style={{ backgroundColor: accentColor, boxShadow: `0 10px 15px -3px ${accentColor}33` }}
+                        >
+                            Get Started
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <DraggableBottomSheet
                 isMenuOpen={isMenuOpen}
                 setIsMenuOpen={setIsMenuOpen}
@@ -1411,18 +1554,26 @@ function DraggableBottomSheet({
     useEffect(() => {
         if (!containerRef.current) return;
 
+        let rAF = 0;
         const observer = new ResizeObserver((entries) => {
-            for (let entry of entries) {
-                const newHeight = entry.target.scrollHeight;
-                if (newHeight > 0 && newHeight !== contentHeight) {
-                    setContentHeight(newHeight);
-                }
-            }
+            cancelAnimationFrame(rAF);
+            rAF = requestAnimationFrame(() => {
+                if (!entries[0]) return;
+                const newHeight = entries[0].target.scrollHeight;
+                setContentHeight((prev) => {
+                    // Only update if the height changed significantly to prevent micro-jank
+                    if (Math.abs(prev - newHeight) > 2) return newHeight;
+                    return prev;
+                });
+            });
         });
 
         observer.observe(containerRef.current);
-        return () => observer.disconnect();
-    }, [contentHeight]);
+        return () => {
+            observer.disconnect();
+            cancelAnimationFrame(rAF);
+        };
+    }, []);
 
     // Handle open/close state changes driven by store
     useEffect(() => {
@@ -1474,7 +1625,7 @@ function DraggableBottomSheet({
             dragMomentum={false}
             onDragEnd={handleDragEnd}
             animate={controls}
-            style={{ y: dragY }}
+            style={{ y: dragY, willChange: "transform" }}
             className="absolute bottom-0 left-0 right-0 z-20 bg-transparent pointer-events-auto"
         >
             <div
@@ -1560,7 +1711,7 @@ function MoleListPanel({
     handleToggleStar: (id: number, current: boolean) => void
 }) {
     const setSelectedMoleId = useAppStore((s: AppState) => s.setSelectedMoleId);
-    const tutorialStep = useAppStore((s: AppState) => s.tutorialStep);
+    const setShowTutorial = useAppStore((s: AppState) => s.setShowTutorial);
     const accentColor = useAppStore((s: AppState) => s.accentColor);
     const filterCondition = useAppStore((s: AppState) => s.filterCondition);
     const setFilterCondition = useAppStore((s: AppState) => s.setFilterCondition);
@@ -1714,12 +1865,10 @@ function MoleListPanel({
                             useAppStore.getState().setIsAddingMole(true);
                             useAppStore.getState().setSelectedMoleId(null);
                         }}
-                        className={`flex items-center justify-center text-slate-900 dark:text-white p-2.5 rounded-xl transition-all active:scale-95 shadow-lg ${tutorialStep === 4 ? "animate-pulse ring-4 z-50 relative" : ""
-                            }`}
+                        className={`flex items-center justify-center text-slate-900 dark:text-white p-2.5 rounded-xl transition-all active:scale-95 shadow-lg`}
                         style={{
                             backgroundColor: accentColor,
                             boxShadow: `0 10px 15px -3px ${accentColor}33`,
-                            outlineColor: tutorialStep === 4 ? `${accentColor}88` : undefined
                         }}
                         title="Add New Mole"
                     >

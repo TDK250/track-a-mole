@@ -32,8 +32,6 @@ export default function CameraController() {
 
         const onStart = () => {
             isFocusing.current = false;
-            // Mark interaction for tutorial
-            useAppStore.getState().setHasInteractedWithModel(true);
         };
 
         orbitControls.addEventListener("start", onStart);

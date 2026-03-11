@@ -33,6 +33,17 @@ export default function MoleMarkers() {
     const renderCluster = (position: [number, number, number], normalArr: [number, number, number] | undefined, count: number | 'several', isSelected: boolean, isPreview: boolean = false, spread: number = 1.0) => {
         if (count === 'several') {
             const baseRadius = 0.012 * spread;
+            // Compute tangent plane for surface-hugging offsets
+            const sNormal = normalArr ? new THREE.Vector3(...normalArr).normalize() : new THREE.Vector3(0, 0, 1);
+            const sTangent = new THREE.Vector3();
+            const sBitangent = new THREE.Vector3();
+            if (Math.abs(sNormal.x) > Math.abs(sNormal.y)) {
+                sTangent.set(sNormal.z, 0, -sNormal.x).normalize();
+            } else {
+                sTangent.set(0, sNormal.z, -sNormal.y).normalize();
+            }
+            sBitangent.crossVectors(sNormal, sTangent);
+
             return (
                 <group position={position}>
                     <mesh>
@@ -45,22 +56,29 @@ export default function MoleMarkers() {
                             opacity={isPreview ? 0.4 : 0.8}
                         />
                     </mesh>
-                    {[0, 1, 2].map((i) => (
-                        <mesh key={i} position={[
-                            Math.cos(i * 2.1) * baseRadius,
-                            Math.sin(i * 2.1) * baseRadius,
-                            0
-                        ]}>
-                            <sphereGeometry args={[0.003, 8, 8]} />
-                            <meshStandardMaterial
-                                color={isPreview ? accentColor : (isSelected ? accentColor : "#45271d")}
-                                emissive={isSelected || isPreview ? accentColor : "#000"}
-                                emissiveIntensity={isSelected ? 0.4 : (isPreview ? 0.2 : 0)}
-                                transparent={isPreview}
-                                opacity={isPreview ? 0.6 : 1}
-                            />
-                        </mesh>
-                    ))}
+                    {[0, 1, 2].map((i) => {
+                        const angle = i * 2.1;
+                        const tx = Math.cos(angle) * baseRadius;
+                        const ty = Math.sin(angle) * baseRadius;
+                        // Offset along tangent plane then pull inward along normal
+                        const curvatureSag = baseRadius * baseRadius * 8;
+                        const off = new THREE.Vector3()
+                            .addScaledVector(sTangent, tx)
+                            .addScaledVector(sBitangent, ty)
+                            .addScaledVector(sNormal, -curvatureSag);
+                        return (
+                            <mesh key={i} position={[off.x, off.y, off.z]}>
+                                <sphereGeometry args={[0.003, 8, 8]} />
+                                <meshStandardMaterial
+                                    color={isPreview ? accentColor : (isSelected ? accentColor : "#45271d")}
+                                    emissive={isSelected || isPreview ? accentColor : "#000"}
+                                    emissiveIntensity={isSelected ? 0.4 : (isPreview ? 0.2 : 0)}
+                                    transparent={isPreview}
+                                    opacity={isPreview ? 0.6 : 1}
+                                />
+                            </mesh>
+                        );
+                    })}
                 </group>
             );
         }
@@ -86,9 +104,13 @@ export default function MoleMarkers() {
                     const angle = i * 137.5 * (Math.PI / 180); // Golden angle
                     const radius = 0.004 * Math.sqrt(i + 1) * spread; // Spread out
 
+                    // Pull each dot inward along the surface normal proportional to
+                    // radius² so the cluster hugs the body curvature.
+                    const curvatureSag = radius * radius * 8;
                     const offset = new THREE.Vector3()
                         .addScaledVector(tangent, Math.cos(angle) * radius)
-                        .addScaledVector(bitangent, Math.sin(angle) * radius);
+                        .addScaledVector(bitangent, Math.sin(angle) * radius)
+                        .addScaledVector(normal, -curvatureSag);
 
                     return (
                         <mesh

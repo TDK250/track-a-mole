@@ -38,9 +38,16 @@ export default function RootLayout({
         root.classList.add(theme);
     }, [theme, mounted]);
 
+    // Determine inline background color to prevent flash
+    const bgColor = theme === 'dark' ? '#020617' : '#f8fafc';
+
     return (
-        <html lang="en" suppressHydrationWarning>
-            <body className={`${inter.className} antialiased overflow-hidden transition-colors duration-300`} suppressHydrationWarning>
+        <html lang="en" className={theme} suppressHydrationWarning>
+            <body
+                className={`${inter.className} antialiased overflow-hidden transition-colors duration-300`}
+                style={{ backgroundColor: bgColor }}
+                suppressHydrationWarning
+            >
                 <PWARegistration />
                 <DisclaimerScreen>
                     <AppLock>

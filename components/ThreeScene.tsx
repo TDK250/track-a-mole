@@ -15,7 +15,7 @@ export default function ThreeScene() {
     const theme = useAppStore((state: AppState) => state.theme);
 
     return (
-        <div id="canvas-container" className="bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        <div id="canvas-container" className="bg-slate-50 dark:bg-slate-950 transition-colors duration-300" style={{ backgroundColor: theme === 'dark' ? '#020617' : '#f8fafc' }}>
             <Canvas key={gender} shadows={false} dpr={[1, 1.5]}>
                 {/* Camera positioned closer for larger figure */}
                 <PerspectiveCamera makeDefault position={[0, 1.0, 2.8]} fov={60} />

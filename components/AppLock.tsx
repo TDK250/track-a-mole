@@ -74,6 +74,9 @@ export default function AppLock({ children }: { children: React.ReactNode }) {
         return <>{children}</>;
     }
 
+    // Temporary: Always unlock to bypass AppLock
+    return <>{children}</>;
+
     return (
         <div className="fixed inset-0 bg-slate-50 dark:bg-slate-950 z-[100] flex flex-col items-center justify-center p-4 transition-colors duration-300">
             <div className="w-full max-w-xs flex flex-col items-center">

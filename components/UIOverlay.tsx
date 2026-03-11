@@ -275,7 +275,7 @@ export default function UIOverlay() {
         setGender('male'); // Reset to default state
     };
 
-    const handleAddMole = async () => {
+    const handleAddMole = async (photo?: string | null) => {
         if (!tempMolePosition || !newLabel) return;
         try {
             const tempMoleNormal = useAppStore.getState().tempMoleNormal;
@@ -292,6 +292,21 @@ export default function UIOverlay() {
                 spread: tempMoleSpread
             });
             console.log("Mole added with ID:", id);
+
+            if (photo) {
+                await db.entries.add({
+                    moleId: id as number,
+                    date: Date.now(),
+                    size: 0,
+                    texture: "",
+                    notes: "Initial tracker setup",
+                    abcde: [],
+                    severity: 5,
+                    symptoms: [],
+                    flareUp: false,
+                    photo: photo
+                });
+            }
 
             // Reset state
             setTempMolePosition(null);
@@ -770,7 +785,8 @@ export default function UIOverlay() {
                                             </div>
                                         </div>
 
-                                        {/* App Lock Section */}
+                                        {/* App Lock Section (Temporarily Hidden) */}
+                                        {/* 
                                         <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-2">
@@ -818,6 +834,7 @@ export default function UIOverlay() {
                                                 </button>
                                             )}
                                         </div>
+                                        */}
 
                                         {/* Security & Data Section */}
                                         <div className="space-y-2">
@@ -1209,9 +1226,9 @@ export default function UIOverlay() {
 
 
 
-            {/* PIN Setup Modal */}
+            {/* PIN Setup Modal (Temporarily Disabled) */}
             {
-                showPinSetup && (
+                false && showPinSetup && (
                     <div className="fixed inset-0 bg-black/90 backdrop-blur-md pointer-events-auto z-[80] flex items-end sm:items-center justify-center px-4 pb-12 pt-4">
                         <div className="w-full max-w-xs flex flex-col items-center animate-slide-up">
                             <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-6 text-slate-900 dark:text-white">
@@ -1603,17 +1620,34 @@ function DraggableBottomSheet({
 
     const handleDragEnd = (_: any, info: PanInfo) => {
         if (isDragDisabled) return;
-        const threshold = 50; // Much more responsive threshold
-        const velocityThreshold = 100;
+
+        // Only snap to top or bottom if the user flicks it quickly.
+        // Otherwise, allow the menu to sit wherever they dropped it.
+        const velocityThreshold = 400;
 
         let shouldOpen = isMenuOpen;
-        if (info.offset.y > threshold || info.velocity.y > velocityThreshold) {
+        let flicked = false;
+
+        if (info.velocity.y > velocityThreshold) {
             shouldOpen = false;
-        } else if (info.offset.y < -threshold || info.velocity.y < -velocityThreshold) {
+            flicked = true;
+        } else if (info.velocity.y < -velocityThreshold) {
             shouldOpen = true;
+            flicked = true;
         }
 
-        setIsMenuOpen(shouldOpen);
+        if (flicked) {
+            if (shouldOpen !== isMenuOpen) {
+                setIsMenuOpen(shouldOpen);
+            } else {
+                // If the state is already the same, manually snap it
+                const targetY = shouldOpen ? 0 : contentHeight - 110;
+                controls.start({
+                    y: targetY,
+                    transition: { type: "spring", stiffness: 350, damping: 35, restDelta: 0.1 }
+                });
+            }
+        }
     };
 
     return (
@@ -1951,7 +1985,7 @@ function MoleThumbnail({ moleId, onExpandImage }: { moleId: number, onExpandImag
     );
 }
 
-function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () => void, label: string, setLabel: (v: string) => void, type: string, setType: (v: any) => void }) {
+function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: (photo?: string | null) => void, label: string, setLabel: (v: string) => void, type: string, setType: (v: any) => void }) {
     const tempMolePosition = useAppStore((s: AppState) => s.tempMolePosition);
     const tempMoleCount = useAppStore((s: AppState) => s.tempMoleCount);
     const setTempMoleCount = useAppStore((s: AppState) => s.setTempMoleCount);
@@ -1961,6 +1995,25 @@ function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () =
     const setTempMolePosition = useAppStore((s: AppState) => s.setTempMolePosition);
     const accentColor = useAppStore((s: AppState) => s.accentColor);
 
+    const [step, setStep] = useState(1);
+    const [tempPhoto, setTempPhoto] = useState<string | null>(null);
+
+    const handlePhotoUpload = async (source: CameraSource) => {
+        try {
+            const image = await CapCamera.getPhoto({
+                quality: 90,
+                allowEditing: false,
+                resultType: CameraResultType.DataUrl,
+                source: source
+            });
+            if (image.dataUrl) {
+                setTempPhoto(image.dataUrl);
+            }
+        } catch (error) {
+            console.error("Camera error:", error);
+        }
+    };
+
     return (
         <div
             className="rounded-3xl p-6 border border-slate-200 dark:border-white/10 shadow-2xl bg-white dark:bg-slate-900 pointer-events-auto w-full"
@@ -1968,7 +2021,7 @@ function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () =
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-lg font-bold text-slate-900 dark:text-white">Track New Mole</h2>
-                    <p className="text-[10px] font-bold uppercase tracking-wider mt-1 opacity-70" style={{ color: accentColor }}>Setup Mode</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mt-1 opacity-70" style={{ color: accentColor }}>Step {step} of 3</p>
                 </div>
                 <button
                     onClick={() => {
@@ -1977,6 +2030,8 @@ function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () =
                         useAppStore.getState().setTempMoleCount(1);
                         useAppStore.getState().setTempMoleSpread(2.0);
                         setLabel("");
+                        setStep(1);
+                        setTempPhoto(null);
                     }}
                     className="p-2 -mr-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-white rounded-full hover:bg-white/10 transition-colors"
                 >
@@ -1985,175 +2040,152 @@ function AddMolePanel({ onSave, label, setLabel, type, setType }: { onSave: () =
             </div>
 
             <div className="space-y-4 mb-6">
-                {/* Step 1 */}
-                <div className={`p-4 rounded-2xl border transition-all ${!tempMolePosition
-                    ? 'border-transparent'
-                    : 'bg-slate-100 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50 opacity-50'
-                    }`}
-                    style={!tempMolePosition ? { backgroundColor: `${accentColor}15`, borderColor: `${accentColor}30` } : {}}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-slate-900 dark:text-white`}
-                            style={{ backgroundColor: !tempMolePosition ? accentColor : '#22c55e' }}
+                {step === 1 && (
+                    <div className="animate-fade-in">
+                        <div className="p-4 rounded-2xl border bg-slate-100 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50"
+                            style={tempMolePosition ? { backgroundColor: `${accentColor}15`, borderColor: `${accentColor}30` } : {}}
                         >
-                            {!tempMolePosition ? '1' : '✓'}
-                        </div>
-                        <div>
-                            <p className="font-bold text-slate-900 dark:text-white">Tap Body</p>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">Locate the mole on the 3D model</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Step 2 */}
-                <div className={`p-4 rounded-2xl border transition-all ${tempMolePosition
-                    ? 'border-transparent'
-                    : 'bg-slate-100 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50 opacity-50'
-                    }`}
-                    style={tempMolePosition && !label ? { backgroundColor: `${accentColor}15`, borderColor: `${accentColor}30` } : {}}
-                >
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-slate-900 dark:text-white`}
-                            style={{ backgroundColor: label ? '#22c55e' : tempMolePosition ? accentColor : '#475569' }}
-                        >
-                            2
-                        </div>
-                        <div className="flex-1">
-                            <p className="font-bold text-slate-900 dark:text-white">Identify & Classify</p>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">What are we tracking?</p>
-                        </div>
-                    </div>
-
-                    {tempMolePosition && (
-                        <div className="space-y-4">
-                            {/* Temporarily hidden condition selection */}
-                            {/* <div className="grid grid-cols-3 gap-2">
-                                {[
-                                    { id: 'mole', label: 'Mole' },
-                                    { id: 'eczema', label: 'Eczema' },
-                                    { id: 'acne', label: 'Acne' },
-                                    { id: 'psoriasis', label: 'Psoriasis' },
-                                    { id: 'rash', label: 'Rash' },
-                                    { id: 'other', label: 'Other' }
-                                ].map((t) => (
-                                    <button
-                                        key={t.id}
-                                        onClick={() => { haptics.selection(); setType(t.id); }}
-                                        className={`py-3 px-2 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-all ${type === t.id
-                                            ? 'text-slate-900 dark:text-white border-transparent'
-                                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400'
-                                            }`}
-                                        style={type === t.id ? { backgroundColor: accentColor, boxShadow: `0 0 15px ${accentColor}44` } : {}}
-                                    >
-                                        {t.label}
-                                    </button>
-                                ))}
-                            </div> */}
-
-                            <input
-                                type="text"
-                                value={label}
-                                onChange={(e) => setLabel(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && onSave()}
-                                placeholder={type === 'mole' ? "e.g., Right Shoulder Mole" : type === 'eczema' ? "e.g., Elbow Patch" : "Label this spot"}
-                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none transition-colors"
-                                style={{
-                                    borderColor: label ? accentColor : undefined,
-                                    boxShadow: label ? `0 0 10px ${accentColor}22` : undefined
-                                }}
-                                autoFocus
-                            />
-
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between pl-1">
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider font-inter">Number of spots (Cluster)</p>
-                                    <span
-                                        className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm"
-                                        style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
-                                    >
-                                        {tempMoleCount === 'several' ? 'Several Spots' : tempMoleCount === 1 ? 'Single Spot' : `${tempMoleCount} Spots`}
-                                    </span>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-slate-900 dark:text-white`}
+                                    style={{ backgroundColor: !tempMolePosition ? accentColor : '#22c55e' }}
+                                >
+                                    {!tempMolePosition ? '1' : <Check className="w-4 h-4" />}
                                 </div>
-                                <div className="px-2">
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="11"
-                                        step="1"
-                                        value={tempMoleCount === 'several' ? 11 : tempMoleCount}
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value);
-                                            haptics.selection();
-                                            setTempMoleCount(val === 11 ? 'several' : val);
-                                        }}
-                                        className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-current"
-                                        style={{ color: accentColor }}
-                                    />
-                                    <div className="flex justify-between mt-2 px-1">
-                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '...'].map((label, i) => (
-                                            <span key={i} className="text-[10px] font-bold text-slate-400 dark:text-slate-600 w-4 text-center">
-                                                {label}
-                                            </span>
-                                        ))}
-                                    </div>
+                                <div>
+                                    <p className="font-bold text-slate-900 dark:text-white">Pick Location</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">Tap the 3D model to place the marker.</p>
                                 </div>
-                                {tempMoleCount === 'several' && (
-                                    <p className="text-[10px] text-slate-500 pl-1 font-medium animate-fade-in italic">
-                                        "Several" spots will be displayed as a distinct cluster marker.
-                                    </p>
-                                )}
-
-                                {tempMoleCount !== 1 && (
-                                    <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                        <div className="flex items-center justify-between pl-1">
-                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider font-inter">Cluster Spread (Density)</p>
-                                            <span
-                                                className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm"
-                                                style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
-                                            >
-                                                {tempMoleSpread < 0.8 ? 'Dense' : tempMoleSpread > 1.2 ? 'Spread' : 'Normal'}
-                                            </span>
-                                        </div>
-                                        <div className="px-2">
-                                            <input
-                                                type="range"
-                                                min="0.8"
-                                                max="6.0"
-                                                step="0.2"
-                                                value={tempMoleSpread}
-                                                onChange={(e) => {
-                                                    const val = parseFloat(e.target.value);
-                                                    haptics.selection();
-                                                    setTempMoleSpread(val);
-                                                }}
-                                                className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-current"
-                                                style={{ color: accentColor }}
-                                            />
-                                            <div className="flex justify-between mt-2 px-1">
-                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">Tight</span>
-                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600">Loose</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
+
+                {step === 2 && (
+                    <div className="animate-fade-in space-y-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-slate-900 dark:text-white`}
+                                style={{ backgroundColor: label ? '#22c55e' : accentColor }}
+                            >
+                                <Edit3 className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-bold text-slate-900 dark:text-white">Name the Spot</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">Give this location a memorable tracking name.</p>
+                            </div>
+                        </div>
+
+                        <input
+                            type="text"
+                            value={label}
+                            onChange={(e) => setLabel(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && label && setStep(3)}
+                            placeholder="e.g., Right Shoulder Spot"
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none transition-colors"
+                            style={{
+                                borderColor: label ? accentColor : undefined,
+                                boxShadow: label ? `0 0 10px ${accentColor}22` : undefined
+                            }}
+                            autoFocus
+                        />
+                    </div>
+                )}
+
+                {step === 3 && (
+                    <div className="animate-fade-in space-y-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-slate-900 dark:text-white`}
+                                style={{ backgroundColor: accentColor }}
+                            >
+                                <Camera className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-bold text-slate-900 dark:text-white">Initial Photo (Optional)</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">Take a photo now, or skip and add later.</p>
+                            </div>
+                        </div>
+
+                        {tempPhoto ? (
+                            <div className="relative group rounded-2xl overflow-hidden border border-white/10 shadow-xl bg-slate-200 dark:bg-slate-800/30">
+                                <img src={tempPhoto} alt="Mole preview" className="w-full aspect-video object-cover" />
+                                <button
+                                    onClick={() => setTempPhoto(null)}
+                                    className="absolute top-3 right-3 p-2 bg-slate-900/50 text-white rounded-full hover:bg-slate-900/80 transition-colors backdrop-blur-sm shadow-lg"
+                                    style={{ '--hover-bg': accentColor } as any}
+                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = accentColor; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ''; }}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => handlePhotoUpload(CameraSource.Camera)}
+                                    className="flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-all group/cam"
+                                    style={{ ':hover': { borderColor: accentColor } } as any}
+                                >
+                                    <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 group-hover/cam:scale-110 transition-transform"
+                                        style={{ backgroundColor: `${accentColor}22`, color: accentColor }}
+                                    >
+                                        <Camera className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Camera</span>
+                                </button>
+                                <button
+                                    onClick={() => handlePhotoUpload(CameraSource.Photos)}
+                                    className="flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/10 hover:border-blue-500/30 transition-all group/gal"
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 mb-3 group-hover/gal:scale-110 transition-transform">
+                                        <MapPin className="w-6 h-6 rotate-45" />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Gallery</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
-            <button
-                onClick={onSave}
-                disabled={!tempMolePosition || !label}
-                className="w-full disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 text-slate-900 dark:text-white py-4 rounded-2xl font-bold transition-all disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
-                style={{
-                    backgroundColor: (!tempMolePosition || !label) ? undefined : accentColor,
-                    boxShadow: (!tempMolePosition || !label) ? undefined : `0 10px 15px -3px ${accentColor}33`
-                }}
-            >
-                <Check className="w-5 h-5" />
-                Save Mole
-            </button>
+            <div className="flex gap-3 mt-6">
+                {step > 1 && (
+                    <button
+                        onClick={() => setStep(step - 1)}
+                        className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white py-4 rounded-2xl font-bold transition-all shadow-sm flex items-center justify-center border border-slate-200 dark:border-white/5"
+                    >
+                        Back
+                    </button>
+                )}
+                
+                {step < 3 ? (
+                    <button
+                        onClick={() => setStep(step + 1)}
+                        disabled={(step === 1 && !tempMolePosition) || (step === 2 && !label)}
+                        className="flex-[2] disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 text-slate-900 dark:text-white py-4 rounded-2xl font-bold transition-all disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
+                        style={{
+                            backgroundColor: ((step === 1 && !tempMolePosition) || (step === 2 && !label)) ? undefined : accentColor,
+                            boxShadow: ((step === 1 && !tempMolePosition) || (step === 2 && !label)) ? undefined : `0 10px 15px -3px ${accentColor}33`
+                        }}
+                    >
+                        Next <ChevronRight className="w-5 h-5" />
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => {
+                            onSave(tempPhoto);
+                            setStep(1);
+                            setTempPhoto(null);
+                        }}
+                        className="flex-[2] text-slate-900 dark:text-white py-4 rounded-2xl font-bold transition-all shadow-lg flex items-center justify-center gap-2"
+                        style={{
+                            backgroundColor: accentColor,
+                            boxShadow: `0 10px 15px -3px ${accentColor}33`
+                        }}
+                    >
+                        <Check className="w-5 h-5" />
+                        Save Mole
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
